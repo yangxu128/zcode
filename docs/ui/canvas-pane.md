@@ -33,14 +33,33 @@
   以附件注入对话——与 whiteboard 的 PNG 附件同模式。
 - Agent 侧无需改动：内容作为普通文件附件进入对话，走既有上传链路。
 
-### T2 · Agent → 画布（待立项，前置为工作区文件写 RPC）
+### T2 · Agent → 画布（工作区文件迁移）
 
-设计方向：画布文档迁移到工作区文件（如 `.zcode/canvas/<boardId>.json`），
-agent 用既有文件工具直接读写，UI 经 `fileWatcherService` 跟随重渲染，
-文档进 git 获得版本历史。**前置条件**：渲染层当前没有任何通用的工作区文件
-写通道（`fileService` 只读、`IZCodeAgentService` 无文件写 RPC），需要先在
-`packages/shared` 协议 + host/server 两侧新增受控的写 RPC（spec 先行）。
-迁移时需一次性导入 localStorage 旧数据。
+画布文档真值迁移到工作区文件 `<workspacePath>/.zcode/canvas/<boardId>.json`
+（CanvasDocument JSON）：agent 用既有文件读写工具即可查看和修改画布，
+文档随工作区进 git 获得版本历史，多窗口/多端自然一致。
+
+**前置：受控文件写 RPC**（本次实现）：
+
+- `IFileService.writeWorkspaceTextFile({ path, content })` →
+  `{ path, bytesWritten }`。与 `readTextFile` 同信任域（宿主进程内直接 fs，
+  绝对路径；agent 写工具本就可写任意工作区路径，此 RPC 不构成新的提权面）。
+- 约束：内容上限 4MB（画布文档远小于此）；父目录自动创建；
+  经 `atomicWriteText` 原子落盘（临时文件 + 重命名 + 重试）。
+
+**画布侧迁移**（本次实现）：
+
+- 持久化所有者改为工作区文件；store 的持久化后端可注入
+  （`setPersistBackend`），默认仍是 localStorage（服务不可用/测试降级），
+  CanvasPane 挂载后切换为文件后端——同一时刻只有一个写入路径。
+- 水合顺序：读文件 → 缺失时读 localStorage 旧键做一次性导入（写文件，
+  旧键保留不删作为备份）→ 都缺失则空画布。
+- 外部变更跟随：`fileWatcherService.watch` 画布文件，`onDynamicChange`
+  触发重读并整体替换 store 文档；自身写入的回声用 `updatedAt` 比对跳过
+  （外部写入若恰好同毫秒会被吞，可忽略）。
+- agent 写入格式约定：合法 CanvasDocument JSON（boardId/nodes/edges 字段，
+  节点 kind 白名单 text|note|image）；非法 JSON 或形状不符时画布保持当前
+  内容并在 debug 日志记录，不崩面板。
 
 ### T3 · 导演台 + 流水线（原型的完全体，远期）
 

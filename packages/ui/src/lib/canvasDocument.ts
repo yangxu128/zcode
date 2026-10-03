@@ -169,6 +169,17 @@ export function buildCanvasBoardId(workspaceKey: string): string {
   return `default-${hashString(workspaceKey)}`;
 }
 
+/**
+ * 画布文档在工作区内的工作区文件路径（T2，docs/ui/canvas-pane.md）：
+ * <workspace>/.zcode/canvas/<boardId>.json。agent 用既有文件工具读写该文件
+ * 即可查看/修改画布。boardId 由 buildCanvasBoardId 产出（小写字母数字，文件名安全）。
+ * 斜杠统一用 "/"：Windows fs API 同样接受，且对远端（Linux）工作区安全。
+ */
+export function buildCanvasFilePath(workspacePath: string, boardId: string): string {
+  const trimmed = workspacePath.replace(/[\\/]+$/, "");
+  return `${trimmed}/.zcode/canvas/${boardId}.json`;
+}
+
 export function createCanvasNodeId(): string {
   return `cn:${createUuid()}`;
 }
@@ -354,7 +365,8 @@ function isValidCanvasNode(value: unknown): value is CanvasNode {
   );
 }
 
-function parseCanvasDocument(raw: string): CanvasDocument | null {
+/** 解析画布文档 JSON；形状不符返回 null（agent 写入的脏数据不崩面板）。 */
+export function parseCanvasDocument(raw: string): CanvasDocument | null {
   try {
     const parsed = JSON.parse(raw) as Partial<CanvasDocument>;
     if (!parsed || !Array.isArray(parsed.nodes)) return null;

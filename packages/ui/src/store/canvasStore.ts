@@ -48,6 +48,17 @@ function emptySession(): CanvasBoardSession {
   return { viewport: { ...DEFAULT_VIEWPORT }, selection: [], linking: null, hoverEdgeId: null };
 }
 
+/**
+ * 持久化后端（T2，docs/ui/canvas-pane.md）：CanvasPane 挂载后注入文件后端
+ * （写工作区文件）；未注入时回落 localStorage（测试/服务不可用降级）。
+ * 同一时刻每个 storageKey 只有一个写入路径。
+ */
+export interface CanvasPersistBackend {
+  save(doc: CanvasDocument): void;
+}
+
+const persistBackends = new Map<string, CanvasPersistBackend>();
+
 export interface CanvasStoreState {
   docs: Record<string, CanvasDocument>;
   hydrated: Record<string, boolean>;
@@ -55,6 +66,9 @@ export interface CanvasStoreState {
 
   hydrate: (params: { storageKey: string; boardId: string }) => void;
   ensureSession: (storageKey: string) => CanvasBoardSession;
+  setPersistBackend: (storageKey: string, backend: CanvasPersistBackend | null) => void;
+  /** 外部真值整体替换（agent/其他窗口写文件后重读），不触发持久化回写。 */
+  replaceExternalDoc: (storageKey: string, doc: CanvasDocument) => void;
 
   addNode: (params: {
     storageKey: string;
@@ -130,7 +144,10 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
       const doc = s.docs[storageKey];
       if (!doc) return s;
       const next = { ...fn(doc), updatedAt: Date.now() };
-      scheduleCanvasPersist(storageKey, next);
+      // 注入了文件后端就只走文件（唯一写入路径）；未注入回落 localStorage 降级。
+      const backend = persistBackends.get(storageKey);
+      if (backend) backend.save(next);
+      else scheduleCanvasPersist(storageKey, next);
       return { docs: { ...s.docs, [storageKey]: next } };
     });
   };
@@ -157,6 +174,20 @@ export const useCanvasStore = create<CanvasStoreState>((set, get) => {
 
     hydrate({ storageKey, boardId }) {
       ensureDoc(storageKey, boardId);
+    },
+
+    setPersistBackend(storageKey, backend) {
+      if (backend) persistBackends.set(storageKey, backend);
+      else persistBackends.delete(storageKey);
+    },
+
+    replaceExternalDoc(storageKey, doc) {
+      // 外部真值（文件已被 agent/其他窗口改写）：整体替换内存副本，不回写持久层。
+      set((s) => ({
+        docs: { ...s.docs, [storageKey]: doc },
+        hydrated: { ...s.hydrated, [storageKey]: true },
+        sessions: { ...s.sessions, [storageKey]: s.sessions[storageKey] ?? emptySession() },
+      }));
     },
 
     ensureSession(storageKey) {

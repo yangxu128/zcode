@@ -2,7 +2,7 @@
 import type { Dirent } from "node:fs";
 import { mkdir, open, readFile, readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { extname, join, relative, sep } from "node:path";
+import { dirname, extname, join, relative, sep } from "node:path";
 import type {
   FileBinaryPreview,
   FileEntry,
@@ -29,8 +29,10 @@ import {
 } from "./workspaceFileIgnore.js";
 import { createServiceLogger } from "../logger/serviceLogger.js";
 import { getConversationWorkspaceDir } from "../paths.js";
+import { atomicWriteText } from "../fs/atomicFileUtils.js";
 const DEFAULT_TEXT_READ_BYTES = 128 * 1024;
 const MAX_TEXT_READ_BYTES = 256 * 1024;
+const MAX_WORKSPACE_TEXT_WRITE_BYTES = 4 * 1024 * 1024;
 const DEFAULT_MEDIA_PREVIEW_BYTES = 4 * 1024 * 1024;
 const MAX_MEDIA_PREVIEW_BYTES = 8 * 1024 * 1024;
 const DEFAULT_BINARY_READ_BYTES = 256 * 1024;
@@ -637,6 +639,21 @@ export function createFileService(options: CreateFileServiceOptions = {}): IFile
       content: string;
     }): Promise<void> {
       await writeWorkspaceFileSearchIgnore(params.rootPath, params.content);
+    },
+    async writeWorkspaceTextFile(params: {
+      path: string;
+      content: string;
+    }): Promise<{ path: string; bytesWritten: number }> {
+      // 内容上限：画布文档等 UI 状态文件远小于此，防止误用演变成大文件写通道。
+      const contentBytes = Buffer.byteLength(params.content, "utf-8");
+      if (contentBytes > MAX_WORKSPACE_TEXT_WRITE_BYTES) {
+        throw new Error(
+          `writeWorkspaceTextFile content too large: ${contentBytes} bytes (max ${MAX_WORKSPACE_TEXT_WRITE_BYTES})`,
+        );
+      }
+      await mkdir(dirname(params.path), { recursive: true });
+      await atomicWriteText(params.path, params.content);
+      return { path: params.path, bytesWritten: contentBytes };
     },
   };
 }

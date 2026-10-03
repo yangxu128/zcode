@@ -3,14 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/components/lib/utils.js";
 import {
   ADD_CANVAS_TO_CHAT_EVENT,
+  buildCanvasFilePath,
   buildCanvasStorageKey,
   createCanvasChatFile,
   downscaleImageToDataUrl,
   findFreeCanvasSpot,
+  parseCanvasDocument,
+  type CanvasDocument,
   type CanvasNode,
   type CanvasNodeKind,
 } from "@/lib/canvasDocument.js";
 import { useCanvasStore } from "@/store/canvasStore.js";
+import { useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
+import { logger } from "@/logger.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { CanvasNodeCard } from "@/app-shell/canvas/CanvasNodeCard.js";
 import { CanvasEdges } from "@/app-shell/canvas/CanvasEdges.js";
@@ -25,7 +30,8 @@ import { CanvasSelectionToolbar } from "@/app-shell/canvas/CanvasSelectionToolba
 
 /**
  * 无限画布侧边面板（docs/ui/canvas-pane.md）。
- * 视口/选区/连线状态在 canvasStore（按 storageKey 分桶）；文档持久化在 localStorage。
+ * 视口/选区/连线状态在 canvasStore（按 storageKey 分桶）；文档真值在工作区文件
+ * .zcode/canvas/<boardId>.json（agent 可直接读写），文件服务不可用时降级 localStorage。
  * 所有依赖视口尺寸的计算使用容器实测 rect，键盘快捷键只绑在画布根元素上。
  */
 
@@ -81,9 +87,127 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
   const selection = session?.selection ?? [];
   const linking = session?.linking ?? null;
 
+  // T2（docs/ui/canvas-pane.md）：文档真值在工作区文件 .zcode/canvas/<boardId>.json，
+  // agent 用既有文件工具即可读写画布。
+  const { fileService, fileWatcherService } = useWorkspaceServices(
+    workspacePath,
+    undefined,
+    workspaceIdentity,
+  );
+  const canvasFilePath = useMemo(
+    () => buildCanvasFilePath(workspacePath, boardId),
+    [workspacePath, boardId],
+  );
+
+  // 文件水合 → 注入文件持久化后端（唯一写入路径）→ watcher 跟随外部（agent）写入。
   useEffect(() => {
-    useCanvasStore.getState().hydrate({ storageKey, boardId });
-  }, [storageKey, boardId]);
+    if (!fileService) {
+      // 服务不可用（测试/降级）：回落 localStorage 持久化。
+      useCanvasStore.getState().hydrate({ storageKey, boardId });
+      return;
+    }
+    let cancelled = false;
+    let cleanupWatch: (() => void) | null = null;
+    let lastPersistedUpdatedAt = 0;
+
+    // stat + readFileRange 分块读：readTextFile 有 256KB 上限，含图片的画布文档会超。
+    const readExternalDoc = async (): Promise<CanvasDocument | null> => {
+      try {
+        const fileStat = await fileService.stat({ path: canvasFilePath });
+        const size = fileStat.size ?? 0;
+        if (fileStat.type !== "file" || size <= 0) return null;
+        const chunks: Uint8Array[] = [];
+        let offset = 0;
+        while (offset < size) {
+          const chunk = await fileService.readFileRange({
+            path: canvasFilePath,
+            offset,
+            length: Math.min(256 * 1024, size - offset),
+          });
+          if (!chunk.length) break;
+          chunks.push(chunk);
+          offset += chunk.length;
+        }
+        const total = chunks.reduce((sum, c) => sum + c.length, 0);
+        const merged = new Uint8Array(total);
+        let cursor = 0;
+        for (const chunk of chunks) {
+          merged.set(chunk, cursor);
+          cursor += chunk.length;
+        }
+        const parsed = parseCanvasDocument(new TextDecoder().decode(merged));
+        return parsed ? { ...parsed, boardId } : null;
+      } catch {
+        return null; // 文件不存在等，按缺失处理
+      }
+    };
+
+    const writeDocFile = async (docToWrite: CanvasDocument) => {
+      try {
+        await fileService.writeWorkspaceTextFile({
+          path: canvasFilePath,
+          content: JSON.stringify(docToWrite, null, 2),
+        });
+        lastPersistedUpdatedAt = docToWrite.updatedAt;
+      } catch (error) {
+        logger.debug("[Canvas] 工作区文件写入失败，保持内存态", { error });
+      }
+    };
+
+    void (async () => {
+      const external = await readExternalDoc();
+      if (cancelled) return;
+      if (external) {
+        useCanvasStore.getState().replaceExternalDoc(storageKey, external);
+        lastPersistedUpdatedAt = external.updatedAt;
+      } else {
+        // 文件缺失：导入 localStorage 旧数据（一次性迁移，旧键保留作备份）。
+        useCanvasStore.getState().hydrate({ storageKey, boardId });
+        const legacy = useCanvasStore.getState().docs[storageKey];
+        if (legacy && (legacy.nodes.length > 0 || legacy.edges.length > 0)) {
+          await writeDocFile(legacy);
+        }
+      }
+      if (cancelled) return;
+
+      let saveTimer: number | null = null;
+      useCanvasStore.getState().setPersistBackend(storageKey, {
+        save(next) {
+          if (saveTimer !== null) window.clearTimeout(saveTimer);
+          saveTimer = window.setTimeout(() => {
+            saveTimer = null;
+            void writeDocFile(next);
+          }, 600);
+        },
+      });
+
+      try {
+        const { id } = await fileWatcherService.watch({ path: canvasFilePath });
+        const unsubscribe = fileWatcherService.onDynamicChange(id)((_event) => {
+          void (async () => {
+            const fresh = await readExternalDoc();
+            if (cancelled || !fresh) return;
+            // 自身写入的回声按 updatedAt 跳过；外部（agent）写入则整体替换。
+            if (fresh.updatedAt === lastPersistedUpdatedAt) return;
+            lastPersistedUpdatedAt = fresh.updatedAt;
+            useCanvasStore.getState().replaceExternalDoc(storageKey, fresh);
+          })();
+        });
+        cleanupWatch = () => {
+          unsubscribe.dispose();
+          fileWatcherService.unwatch({ id }).catch(() => undefined);
+        };
+      } catch (error) {
+        logger.debug("[Canvas] 文件监听不可用，跳过 agent 变更跟随", { error });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      useCanvasStore.getState().setPersistBackend(storageKey, null);
+      cleanupWatch?.();
+    };
+  }, [fileService, fileWatcherService, storageKey, boardId, workspacePath, canvasFilePath]);
 
   useEffect(() => {
     const el = rootRef.current;
