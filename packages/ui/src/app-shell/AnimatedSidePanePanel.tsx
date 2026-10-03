@@ -27,6 +27,7 @@ import { ScopedErrorBoundary } from "@/ErrorBoundary.js";
 import { GitPane } from "@/GitPane.js";
 import { TreemappingPane } from "@/TreemappingPane.js";
 import { WhiteboardPane } from "@/WhiteboardPane.js";
+import { CanvasPane } from "@/app-shell/CanvasPane.js";
 import { ModelTrajectoryPane } from "@/ModelTrajectoryPane.js";
 import { DeveloperToolsPane } from "@/DeveloperToolsPane.js";
 import { cn } from "@/components/lib/utils.js";
@@ -92,6 +93,7 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import {
   BugIcon,
   FileDiffIcon,
+  FrameIcon,
   GlobeIcon,
   MessageSquareTextIcon,
   PlusIcon,
@@ -312,6 +314,7 @@ export function AnimatedSidePanePanel({
   onReopenClosedTab,
   onOpenBrowserTab,
   onOpenWhiteboard: _onOpenWhiteboard,
+  onOpenCanvasTab,
   onOpenDeveloperTools,
   onOpenTerminalTab,
   onOpenReviewTab,
@@ -377,6 +380,7 @@ export function AnimatedSidePanePanel({
   onReopenClosedTab: (tabId: string) => void;
   onOpenBrowserTab: () => void;
   onOpenWhiteboard: () => void;
+  onOpenCanvasTab: () => void;
   onOpenDeveloperTools: () => void;
   onOpenTerminalTab: () => void;
   onOpenReviewTab: () => void;
@@ -735,6 +739,13 @@ export function AnimatedSidePanePanel({
             <span>{intl.formatMessage({ id: "terminal.title" })}</span>
           </DropdownMenuItem>
         ) : null}
+        <DropdownMenuItem
+          data-side-pane-add-item="canvas"
+          onSelect={onOpenCanvasTab}
+        >
+          <FrameIcon className="size-4" />
+          <span>{intl.formatMessage({ id: "canvas.title" })}</span>
+        </DropdownMenuItem>
         {supportsEmbeddedBrowser ? (
           <DropdownMenuItem
             data-side-pane-add-item="browser"
@@ -784,6 +795,12 @@ export function AnimatedSidePanePanel({
       label: intl.formatMessage({ id: "browser.title" }),
       icon: GlobeIcon,
       onOpen: onOpenBrowserTab,
+    },
+    canvas: {
+      id: "canvas",
+      label: intl.formatMessage({ id: "canvas.title" }),
+      icon: FrameIcon,
+      onOpen: onOpenCanvasTab,
     },
     "developer-tools": {
       id: "developer-tools",
@@ -879,6 +896,7 @@ export function AnimatedSidePanePanel({
         codeViewerTitle: intl.formatMessage({ id: "codeViewer.title" }),
         treemappingTitle: intl.formatMessage({ id: "treemapping.title" }),
         whiteboardTitle: intl.formatMessage({ id: "whiteboard.title" }),
+        canvasTitle: intl.formatMessage({ id: "canvas.title" }),
         modelTrajectoryTitle: intl.formatMessage({
           id: "modelTrajectory.title",
         }),
@@ -1235,6 +1253,12 @@ export function AnimatedSidePanePanel({
                             workspacePath={workspaceAbsPath}
                             workspaceIdentity={workspaceIdentity}
                             boardId={tab.boardId}
+                          />
+                        ) : tab.type === "canvas" ? (
+                          <CanvasPane
+                            workspacePath={workspaceAbsPath}
+                            workspaceIdentity={workspaceIdentity}
+                            boardId={tab.id}
                           />
                         ) : tab.type === "model-trajectory" ? (
                           <ModelTrajectoryPane

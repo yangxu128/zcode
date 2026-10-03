@@ -3,6 +3,7 @@ import { useRef, type CSSProperties } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  FrameIcon,
   BotIcon,
   BotMessageSquareIcon,
   BugIcon,
@@ -340,6 +341,10 @@ export function SidePaneTabIcon({ tab }: { tab: WorkspaceSidePaneTab }) {
     return <BrowserUseTabIcon tab={tab} />;
   }
 
+  if (tab.type === "canvas") {
+    return <FrameIcon className="size-3.5 shrink-0 text-foreground-subtle" />;
+  }
+
   if (tab.source.type === "patch") {
     const fileDisplayTarget = getPatchFileDisplayTarget(tab.source);
     if (fileDisplayTarget) {
@@ -526,6 +531,10 @@ export function getSidePaneTabTitle(
 
   if (tab.type === "whiteboard") {
     return tab.title || formatMessage({ id: "whiteboard.title" });
+  }
+
+  if (tab.type === "canvas") {
+    return formatMessage({ id: "canvas.title" });
   }
 
   if (tab.type === "model-trajectory") {

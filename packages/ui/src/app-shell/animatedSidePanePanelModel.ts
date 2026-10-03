@@ -5,6 +5,7 @@ export type OpenTabLauncherItemId =
   | "review"
   | "terminal"
   | "browser"
+  | "canvas"
   | "developer-tools";
 
 export function resolveOpenTabLauncherItemIds({
@@ -33,6 +34,8 @@ export function resolveOpenTabLauncherItemIds({
   if (supportsEmbeddedBrowser) {
     itemIds.push("browser");
   }
+
+  itemIds.push("canvas");
 
   if (developerToolsEnabled) {
     itemIds.push("developer-tools");

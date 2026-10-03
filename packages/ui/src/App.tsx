@@ -230,6 +230,7 @@ export function App({
     handleOpenGit,
     handleOpenTreemapping,
     handleOpenWhiteboard,
+    handleOpenCanvasTab,
     handleOpenDeveloperTools,
     handleOpenTerminalTab,
     handleOpenSubagentSession,
@@ -1271,6 +1272,7 @@ export function App({
         handleOpenBrowserTab={handleOpenBrowserTab}
         handleOpenTreemapping={handleOpenTreemappingIfWritable}
         handleOpenWhiteboard={handleOpenWhiteboard}
+        handleOpenCanvasTab={handleOpenCanvasTab}
         handleOpenDeveloperTools={handleOpenDeveloperTools}
         handleOpenTerminalTab={handleOpenTerminalTabIfWritable}
         handleToggleGit={handleToggleGitIfWritable}

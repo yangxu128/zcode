@@ -66,6 +66,16 @@ export interface WhiteboardSidePaneTab {
   title: string;
 }
 
+export interface CanvasSidePaneTab {
+  id: string;
+  type: "canvas";
+  ownerTaskId?: string | null;
+  workspaceKey?: string | null;
+  openedAt?: number;
+  /** 展示标题（打开时冻结的兜底，标题解析优先用 canvas.title 文案）。 */
+  title: string;
+}
+
 export interface ModelTrajectorySidePaneTab {
   id: string;
   type: "model-trajectory";
@@ -516,6 +526,7 @@ export interface OpenScopedSubagentSideTabRequest extends OpenSubagentSideTabReq
 export type WorkspaceSidePaneTab =
   | BackgroundBashSidePaneTab
   | BrowserSidePaneTab
+  | CanvasSidePaneTab
   | GitSidePaneTab
   | CodeViewerSidePaneTab
   | TreemappingSidePaneTab
@@ -935,6 +946,15 @@ function createWhiteboardSidePaneTab(options: {
     id: `whiteboard:${options.boardId}`,
     type: "whiteboard",
     boardId: options.boardId,
+    openedAt: Date.now(),
+    title: options.title,
+  };
+}
+
+function createCanvasSidePaneTab(options: { boardId: string; title: string }): CanvasSidePaneTab {
+  return {
+    id: `canvas:${options.boardId}`,
+    type: "canvas",
     openedAt: Date.now(),
     title: options.title,
   };
@@ -1568,6 +1588,16 @@ export function openWhiteboardSidePane(
   },
 ): WorkspaceSidePaneState {
   return activateSidePaneTab(current, createWhiteboardSidePaneTab(options));
+}
+
+export function openCanvasSidePane(
+  current: WorkspaceSidePaneState | null,
+  options: {
+    boardId: string;
+    title: string;
+  },
+): WorkspaceSidePaneState {
+  return activateSidePaneTab(current, createCanvasSidePaneTab(options));
 }
 
 export function openModelTrajectorySidePane(
