@@ -1255,7 +1255,8 @@ export function AnimatedSidePanePanel({
                           <CanvasPane
                             workspacePath={workspaceAbsPath}
                             workspaceIdentity={workspaceIdentity}
-                            boardId={tab.boardId}
+                            // 旧版本持久化的 tab 无 boardId，从 id 派生兜底。
+                            boardId={tab.boardId ?? tab.id.replace(/^canvas:/, "")}
                           />
                         ) : tab.type === "model-trajectory" ? (
                           <ModelTrajectoryPane
