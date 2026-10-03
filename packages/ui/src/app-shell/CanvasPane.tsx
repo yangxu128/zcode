@@ -149,8 +149,39 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
           content: JSON.stringify(docToWrite, null, 2),
         });
         lastPersistedUpdatedAt = docToWrite.updatedAt;
+        // 首次写入后文件才存在：watch 挂载失败（ENOENT）时在这里补建监听。
+        await ensureWatching();
       } catch (error) {
         logger.debug("[Canvas] 工作区文件写入失败，保持内存态", { error });
+      }
+    };
+
+    // watch 文件可能尚不存在（首次使用、挂载早于首次写入），失败后由
+    // writeDocFile 成功路径重试；一旦建联即幂等跳过。
+    const ensureWatching = async () => {
+      if (cancelled || cleanupWatch) return;
+      try {
+        const { id } = await fileWatcherService.watch({ path: canvasFilePath });
+        if (cancelled) {
+          fileWatcherService.unwatch({ id }).catch(() => undefined);
+          return;
+        }
+        const unsubscribe = fileWatcherService.onDynamicChange(id)((_event) => {
+          void (async () => {
+            const fresh = await readExternalDoc();
+            if (cancelled || !fresh) return;
+            // 自身写入的回声按 updatedAt 跳过；外部（agent）写入则整体替换。
+            if (fresh.updatedAt === lastPersistedUpdatedAt) return;
+            lastPersistedUpdatedAt = fresh.updatedAt;
+            useCanvasStore.getState().replaceExternalDoc(storageKey, fresh);
+          })();
+        });
+        cleanupWatch = () => {
+          unsubscribe.dispose();
+          fileWatcherService.unwatch({ id }).catch(() => undefined);
+        };
+      } catch (error) {
+        logger.debug("[Canvas] 文件监听暂不可用（文件可能尚未创建，首次写入后重试）", { error });
       }
     };
 
@@ -181,25 +212,7 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
         },
       });
 
-      try {
-        const { id } = await fileWatcherService.watch({ path: canvasFilePath });
-        const unsubscribe = fileWatcherService.onDynamicChange(id)((_event) => {
-          void (async () => {
-            const fresh = await readExternalDoc();
-            if (cancelled || !fresh) return;
-            // 自身写入的回声按 updatedAt 跳过；外部（agent）写入则整体替换。
-            if (fresh.updatedAt === lastPersistedUpdatedAt) return;
-            lastPersistedUpdatedAt = fresh.updatedAt;
-            useCanvasStore.getState().replaceExternalDoc(storageKey, fresh);
-          })();
-        });
-        cleanupWatch = () => {
-          unsubscribe.dispose();
-          fileWatcherService.unwatch({ id }).catch(() => undefined);
-        };
-      } catch (error) {
-        logger.debug("[Canvas] 文件监听不可用，跳过 agent 变更跟随", { error });
-      }
+      await ensureWatching();
     })();
 
     return () => {
