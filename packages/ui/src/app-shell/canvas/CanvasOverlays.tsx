@@ -4,6 +4,7 @@ import {
   ImagePlus,
   Magnet,
   Maximize2,
+  SendHorizontal,
   MousePointer2,
   StickyNote,
   Type,
@@ -138,16 +139,31 @@ export const CanvasControls = memo(function CanvasControls({
   onToggleSnap,
   onZoomBy,
   onFitView,
+  onSendToChat,
+  sendDisabled = false,
 }: {
   zoom: number;
   snap: boolean;
   onToggleSnap: () => void;
   onZoomBy: (factor: number) => void;
   onFitView: () => void;
+  onSendToChat: () => void;
+  sendDisabled?: boolean;
 }) {
   const { intl } = useZCodeIntl();
   return (
     <div className="zcode-canvas-controls" onPointerDown={(event) => event.stopPropagation()}>
+      <button
+        type="button"
+        data-canvas-control="send-chat"
+        className="zcode-canvas-ctl"
+        title={intl.formatMessage({ id: "canvas.sendToChat.title" })}
+        disabled={sendDisabled}
+        onClick={onSendToChat}
+      >
+        <SendHorizontal className="size-3.5" />
+      </button>
+      <span className="zcode-canvas-ctl-sep" />
       <button
         type="button"
         data-canvas-control="zoom-out"

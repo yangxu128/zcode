@@ -981,6 +981,8 @@ const zhCN: Record<string, string> = {
   "canvas.hint.wheel": "滚轮缩放",
   "canvas.hint.snap": "吸附",
   "canvas.hint.hand": "手型",
+  "canvas.sendToChat": "发送到对话",
+  "canvas.sendToChat.title": "把选中节点（或整块画布）作为附件发送到当前对话",
   "whiteboard.defaultName": "画板",
   "whiteboard.nameLabel": "画板名称",
   "whiteboard.canvasLabel": "画板画布",

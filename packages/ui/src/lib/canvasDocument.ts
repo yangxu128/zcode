@@ -8,6 +8,79 @@ import { logger } from "@/logger.js";
  * 交互架构参考外部项目 shortdrama-studio 的自研画布，按 ZCode 约定重新适配。
  */
 
+/** T1 联动：画布内容作为附件发送到聚焦中的对话（消费方在 useComposerAttachments）。 */
+export const ADD_CANVAS_TO_CHAT_EVENT = "zcode:add-canvas-to-chat";
+
+export interface AddCanvasToChatEventDetail {
+  workspacePath: string;
+  workspaceIdentity?: string;
+  files: File[];
+}
+
+export function isAddCanvasToChatEvent(
+  event: Event,
+): event is CustomEvent<AddCanvasToChatEventDetail> {
+  return (
+    event instanceof CustomEvent &&
+    event.type === ADD_CANVAS_TO_CHAT_EVENT &&
+    event.detail?.files instanceof Array
+  );
+}
+
+/** 画布文档 → Markdown（对话附件）。图片 data URL 不内联，仅标注存在。 */
+export function serializeCanvasToMarkdown(
+  doc: CanvasDocument,
+  selectedIds?: readonly string[],
+): string {
+  const idSet = selectedIds?.length ? new Set(selectedIds) : null;
+  const nodes = idSet ? doc.nodes.filter((n) => idSet.has(n.id)) : doc.nodes;
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const edges = doc.edges.filter((e) => nodeById.has(e.from) && nodeById.has(e.to));
+  const kindLabel = (kind: CanvasNode["kind"]) =>
+    kind === "text" ? "文本" : kind === "note" ? "便签" : "图片";
+  const lines: string[] = [
+    "# 无限画布",
+    "",
+    `> 导出于 ${new Date().toLocaleString("zh-CN")}，共 ${nodes.length} 个节点 / ${edges.length} 条连线`,
+    "",
+  ];
+  if (nodes.length) {
+    lines.push("## 节点", "");
+    for (const node of nodes) {
+      lines.push(`### [${kindLabel(node.kind)}] ${node.title || "(未命名)"}`, "");
+      if (node.kind === "text") {
+        if (node.content.trim()) lines.push(node.content.trim(), "");
+      } else if (node.kind === "note") {
+        if (node.body.trim()) lines.push(node.body.trim(), "");
+      } else {
+        if (node.caption.trim()) lines.push(`说明：${node.caption.trim()}`, "");
+        lines.push(node.url ? "（含图片内容，见附件原图）" : "（无图片）", "");
+      }
+    }
+  }
+  if (edges.length) {
+    const nameOf = (id: string) => {
+      const node = nodeById.get(id);
+      return `「${node?.title || "(未命名)"}」`;
+    };
+    lines.push("## 连线", "");
+    for (const edge of edges) {
+      lines.push(
+        `- ${nameOf(edge.from)} --${edge.kind === "flow" ? "流程" : "依赖"}--> ${nameOf(edge.to)}`,
+      );
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+export function createCanvasChatFile(doc: CanvasDocument, selectedIds?: readonly string[]): File {
+  const content = serializeCanvasToMarkdown(doc, selectedIds);
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+  const scope = selectedIds?.length ? "selection" : "board";
+  return new File([content], `canvas-${scope}-${stamp}.md`, { type: "text/markdown" });
+}
+
 export type CanvasNodeKind = "text" | "note" | "image";
 export type CanvasEdgeKind = "flow" | "depends";
 export type CanvasNoteColor = "amber" | "sky" | "green" | "violet" | "rose";

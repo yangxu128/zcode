@@ -26,6 +26,7 @@ import {
   createWhiteboardPngFile,
   isWhiteboardAddToChatEvent,
 } from "@/lib/whiteboard.js";
+import { ADD_CANVAS_TO_CHAT_EVENT, isAddCanvasToChatEvent } from "@/lib/canvasDocument.js";
 import { useWhiteboardStore } from "@/store/whiteboardStore.js";
 import type { ChatComposerPasteEvent } from "@/LexicalChatInput.js";
 import type { IPromptAttachmentTransferService } from "@zcode/services";
@@ -902,6 +903,22 @@ export function useComposerAttachments(
     window.addEventListener(WHITEBOARD_ADD_TO_CHAT_EVENT, handle);
     return () => window.removeEventListener(WHITEBOARD_ADD_TO_CHAT_EVENT, handle);
   }, [addWhiteboardToChat, listenAddToChatEvents, workspaceIdentity, workspacePath]);
+
+  // 画布 → 对话：与 whiteboard 同模式。画布面板本地序列化 Markdown 文件后广播，
+  // 只有聚焦中的 composer 消费（listenAddToChatEvents），并按 workspace 归属过滤。
+  useEffect(() => {
+    if (!listenAddToChatEvents || typeof window === "undefined") return;
+    const handle = (event: Event) => {
+      if (!isAddCanvasToChatEvent(event)) return;
+      const detailKey = event.detail.workspaceIdentity?.trim() || event.detail.workspacePath;
+      const ownKey = workspaceIdentity?.trim() || workspacePath;
+      if (detailKey !== ownKey) return;
+      event.preventDefault();
+      addAttachmentFiles(event.detail.files);
+    };
+    window.addEventListener(ADD_CANVAS_TO_CHAT_EVENT, handle);
+    return () => window.removeEventListener(ADD_CANVAS_TO_CHAT_EVENT, handle);
+  }, [addAttachmentFiles, listenAddToChatEvents, workspaceIdentity, workspacePath]);
 
   const removeAttachment = useCallback(
     (id: string) => {

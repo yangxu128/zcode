@@ -1062,6 +1062,8 @@ const enUS: Record<string, string> = {
   "canvas.hint.wheel": "wheel to zoom",
   "canvas.hint.snap": "snap",
   "canvas.hint.hand": "hand",
+  "canvas.sendToChat": "Send to chat",
+  "canvas.sendToChat.title": "Attach selected nodes (or the whole canvas) to the current chat",
   "whiteboard.defaultName": "Whiteboard",
   "whiteboard.nameLabel": "Whiteboard name",
   "whiteboard.canvasLabel": "Whiteboard canvas",

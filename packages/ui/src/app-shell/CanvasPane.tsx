@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/components/lib/utils.js";
 import {
+  ADD_CANVAS_TO_CHAT_EVENT,
   buildCanvasStorageKey,
+  createCanvasChatFile,
   downscaleImageToDataUrl,
   findFreeCanvasSpot,
   type CanvasNode,
@@ -408,6 +410,17 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
     [paneRect, spawnAt, storageKey, store],
   );
 
+  const handleSendToChat = useCallback(() => {
+    if (!doc) return;
+    // 选中节点优先；无选中时发送整块画布。经 CustomEvent 交给聚焦中的 composer 附件。
+    const file = createCanvasChatFile(doc, selection.length ? selection : undefined);
+    window.dispatchEvent(
+      new CustomEvent(ADD_CANVAS_TO_CHAT_EVENT, {
+        detail: { workspacePath, workspaceIdentity, files: [file] },
+      }),
+    );
+  }, [doc, selection, workspacePath, workspaceIdentity]);
+
   const backgroundMenuItems = (worldX: number, worldY: number): CanvasMenuItem[] => {
     const nodeKinds: { kind: CanvasNodeKind; key: string }[] = [
       { kind: "text", key: "canvas.node.text" },
@@ -648,6 +661,8 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
           })
         }
         onFitView={() => store.getState().fitView({ storageKey, rect: paneRect })}
+        onSendToChat={handleSendToChat}
+        sendDisabled={!nodes.length}
       />
 
       <CanvasMinimap

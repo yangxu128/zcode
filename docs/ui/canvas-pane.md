@@ -19,6 +19,34 @@
 - 图片节点：本地上传经 canvas 降采样（最长边 1280、JPEG 0.85）转 data URL 存储；
   `URL.createObjectURL` 不落盘，不得作为持久化来源。
 
+## 与 Agent 联动
+
+### T1 · 画布 → 对话（已实现）
+
+- 入口：画布右下控制区最左侧的「发送到对话」按钮；有选中节点时只发送选区，
+  否则发送整块画布。
+- 序列化：`serializeCanvasToMarkdown` 把节点（标题/正文/说明）与连线关系
+  （流程/依赖）转为 Markdown；图片 data URL 不内联，仅标注存在。
+- 传递：画布面板派发 `zcode:add-canvas-to-chat` CustomEvent（detail 携带
+  workspacePath/Identity 与构造好的 Markdown File），`useComposerAttachments`
+  中聚焦的 composer 监听该事件，按 workspace 归属过滤后经 `addAttachmentFiles`
+  以附件注入对话——与 whiteboard 的 PNG 附件同模式。
+- Agent 侧无需改动：内容作为普通文件附件进入对话，走既有上传链路。
+
+### T2 · Agent → 画布（待立项，前置为工作区文件写 RPC）
+
+设计方向：画布文档迁移到工作区文件（如 `.zcode/canvas/<boardId>.json`），
+agent 用既有文件工具直接读写，UI 经 `fileWatcherService` 跟随重渲染，
+文档进 git 获得版本历史。**前置条件**：渲染层当前没有任何通用的工作区文件
+写通道（`fileService` 只读、`IZCodeAgentService` 无文件写 RPC），需要先在
+`packages/shared` 协议 + host/server 两侧新增受控的写 RPC（spec 先行）。
+迁移时需一次性导入 localStorage 旧数据。
+
+### T3 · 导演台 + 流水线（原型的完全体，远期）
+
+画布内配置生成任务并发起 agent 运行，流式结果写回节点；依赖 T2 与
+agent 运行接管（权限、流式、取消）在面板内的呈现。
+
 ## 状态所有者
 
 单一所有者：`packages/ui/src/store/canvasStore.ts`（zustand，仿 whiteboardStore 模式）。
@@ -74,7 +102,8 @@
 
 ## 非目标
 
-- 不做多画布管理、画布分享/导出、Agent 驱动节点生成。
-- 不做跨窗口/移动端实时同步（whiteboard 同样未做，画布数据为本地工作区维度）。
+- 不做多画布管理、画布分享/导出。
 - 不迁移或复用 whiteboard 的数据；两者是独立面板类型。
 - 不引入 react-flow 等第三方画布依赖（参考实现证明自研可行且可控）。
+- Agent 驱动节点生成（原型的导演台/流水线）为 T3 远期项；当前联动边界见
+  「与 Agent 联动」一节（T1 已实现，T2 待工作区文件写 RPC）。
