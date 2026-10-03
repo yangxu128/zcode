@@ -71,6 +71,7 @@ export interface CanvasSidePaneTab {
   type: "canvas";
   ownerTaskId?: string | null;
   workspaceKey?: string | null;
+  boardId: string;
   openedAt?: number;
   /** 展示标题（打开时冻结的兜底，标题解析优先用 canvas.title 文案）。 */
   title: string;
@@ -955,6 +956,7 @@ function createCanvasSidePaneTab(options: { boardId: string; title: string }): C
   return {
     id: `canvas:${options.boardId}`,
     type: "canvas",
+    boardId: options.boardId,
     openedAt: Date.now(),
     title: options.title,
   };

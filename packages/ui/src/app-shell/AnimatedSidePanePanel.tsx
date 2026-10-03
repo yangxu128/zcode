@@ -739,10 +739,7 @@ export function AnimatedSidePanePanel({
             <span>{intl.formatMessage({ id: "terminal.title" })}</span>
           </DropdownMenuItem>
         ) : null}
-        <DropdownMenuItem
-          data-side-pane-add-item="canvas"
-          onSelect={onOpenCanvasTab}
-        >
+        <DropdownMenuItem data-side-pane-add-item="canvas" onSelect={onOpenCanvasTab}>
           <FrameIcon className="size-4" />
           <span>{intl.formatMessage({ id: "canvas.title" })}</span>
         </DropdownMenuItem>
@@ -1258,7 +1255,7 @@ export function AnimatedSidePanePanel({
                           <CanvasPane
                             workspacePath={workspaceAbsPath}
                             workspaceIdentity={workspaceIdentity}
-                            boardId={tab.id}
+                            boardId={tab.boardId}
                           />
                         ) : tab.type === "model-trajectory" ? (
                           <ModelTrajectoryPane
