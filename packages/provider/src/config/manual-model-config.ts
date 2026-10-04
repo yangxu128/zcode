@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { completeModelConfigDataSchema, modelConfigDataSchema } from "@zcode/shared/model-config";
+import {
+  completeEnumOptionSpecDataSchema,
+  completeLimitOptionSpecDataSchema,
+  completeModelConfigDataSchema,
+  modelConfigDataSchema,
+} from "@zcode/shared/model-config";
 
 const complete = completeModelConfigDataSchema.shape;
 // 手动模式只冻结产品明确开放的叶子；新增系统字段默认不属于个人手动配置。
@@ -21,9 +26,18 @@ export const manualModelConfigSchema = completeModelConfigDataSchema
           supportsPdf: true,
         }),
       }),
-    optionSpecs: complete.optionSpecs.pick({ reasoningLevel: true }).extend({
-      maxOutputTokens: complete.optionSpecs.shape.maxOutputTokens.pick({ max: true }),
-    }),
+    // 生图/生视频等非文本输出模型没有推理档位与文本输出上限，
+    // 手动模式的 optionSpecs 叶子整体可省略（docs/ui/provider-model-output-modality.md）。
+    optionSpecs: z
+      .object({
+        reasoningLevel: completeEnumOptionSpecDataSchema.pick({ values: true }).extend({
+          map: completeEnumOptionSpecDataSchema.shape.map,
+        }),
+        maxOutputTokens: completeLimitOptionSpecDataSchema.pick({
+          max: true,
+        }),
+      })
+      .partial(),
   });
 
 export type ManualModelConfig = z.infer<typeof manualModelConfigSchema>;

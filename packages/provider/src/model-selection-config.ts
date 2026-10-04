@@ -17,8 +17,10 @@ interface ModelSelectionCompletionView {
     readonly models: readonly {
       readonly modelId: string;
       readonly config: {
-        readonly optionSpecs: {
-          readonly reasoningLevel: { readonly values: readonly string[] };
+        // 生图/生视频等非文本输出模型可省略 reasoningLevel
+        // （docs/ui/provider-model-output-modality.md）。
+        readonly optionSpecs?: {
+          readonly reasoningLevel?: { readonly values: readonly string[] };
         };
       };
     }[];
@@ -62,7 +64,7 @@ export function completeNewModelSelection(
   const model = registry.providers
     .find((provider) => provider.providerId === selection.providerId)
     ?.models.find((candidate) => candidate.modelId === selection.modelId);
-  const reasoningLevel = model?.config.optionSpecs.reasoningLevel.values.at(-1);
+  const reasoningLevel = model?.config.optionSpecs?.reasoningLevel?.values.at(-1);
   if (!reasoningLevel) return undefined;
   return {
     providerId: selection.providerId,
@@ -84,7 +86,9 @@ export function normalizeModelSelection(
     .find((provider) => provider.providerId === selection.providerId)
     ?.models.find((candidate) => candidate.modelId === selection.modelId);
   if (!model) return undefined;
-  const values = model.config.optionSpecs.reasoningLevel.values;
+  // 无推理档位的模型（生图/生视频）：normalize 只保留身份，档位永远缺失。
+  const values = model.config.optionSpecs?.reasoningLevel?.values;
+  if (!values) return selection;
   const reasoningLevel = selection.options?.reasoningLevel;
   if (reasoningLevel !== undefined && values.includes(reasoningLevel)) return selection;
   return {

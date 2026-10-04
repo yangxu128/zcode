@@ -386,6 +386,7 @@ export function ProviderModelsSection({
     | "contextWindow"
     | "maxOutputTokens"
     | "inputFormat"
+    | "outputFormat"
     | "reasoningLevelValues"
     | "reasoningLevelMap"
     | null

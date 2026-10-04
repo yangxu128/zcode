@@ -109,10 +109,17 @@ export function resolveDraftInitialModelSelection(
     const model = findModel(view, recent);
     if (!model) return { selection: null, invalidated: true };
     const reasoning = recent.options?.reasoningLevel;
-    if (
-      reasoning === undefined ||
-      !model.config.optionSpecs.reasoningLevel.values.includes(reasoning)
-    ) {
+    const reasoningSpec = model.config.optionSpecs?.reasoningLevel;
+    // 无推理档位的模型（生图/生视频）：身份即完整选择；带档位的旧最近项则失效。
+    if (reasoningSpec === undefined) {
+      return recent.options?.reasoningLevel
+        ? {
+            selection: { providerId: recent.providerId, modelId: recent.modelId },
+            invalidated: true,
+          }
+        : { selection: recent, invalidated: false };
+    }
+    if (reasoning === undefined || !reasoningSpec.values.includes(reasoning)) {
       // 仍保留 Provider/Model 身份，但清空失效档位；Composer 不弹泛化通知，
       // 让空的 Reasoning 控件直接要求用户作出新的明确选择。
       return {
@@ -135,8 +142,10 @@ function isSelectionInView(view: ModelSelectionView, selection: ModelSelection):
   const model = findModel(view, selection);
   if (!model) return false;
   const reasoning = selection.options?.reasoningLevel;
-  const reasoningSpec = model.config.optionSpecs.reasoningLevel;
-  return reasoning !== undefined && reasoningSpec.values.includes(reasoning);
+  const reasoningSpec = model.config.optionSpecs?.reasoningLevel;
+  return reasoningSpec
+    ? reasoning !== undefined && reasoningSpec.values.includes(reasoning)
+    : reasoning === undefined;
 }
 
 function findModel(view: ModelSelectionView, selection: ModelSelection) {

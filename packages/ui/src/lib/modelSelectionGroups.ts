@@ -51,18 +51,23 @@ export function buildRegistryModelSelectGroups(
         label: accountPresentation?.label || provider.providerName?.trim() || provider.providerId,
         ...(accountPresentation?.labelBadge ? { labelBadge: accountPresentation.labelBadge } : {}),
         ...(accountPresentation ? { directItems: true } : {}),
-        items: provider.models.map(({ modelId, config }) => ({
-          key: `registry-provider:${provider.providerId}:${modelId}`,
-          value: encodeCustomModelValue(provider.providerId, modelId),
-          name: modelId,
-          ...(shouldShowModelVisionBadge(
-            modelId,
-            config.properties?.inputFormat?.supportsImage,
-            provider.config.access,
-          )
-            ? { supportsVisionInput: true }
-            : {}),
-        })),
+        // 生图/生视频等非文本输出模型不是聊天模型（docs/ui/provider-model-output-modality.md），
+        // 不进入聊天模型选择器；否则选择后必然产生无法完成的对话请求。
+        // supportsText 未设置（旧数据/内置规则）按聊天模型处理。
+        items: provider.models
+          .filter(({ config }) => config.properties?.outputFormat?.supportsText !== false)
+          .map(({ modelId, config }) => ({
+            key: `registry-provider:${provider.providerId}:${modelId}`,
+            value: encodeCustomModelValue(provider.providerId, modelId),
+            name: modelId,
+            ...(shouldShowModelVisionBadge(
+              modelId,
+              config.properties?.inputFormat?.supportsImage,
+              provider.config.access,
+            )
+              ? { supportsVisionInput: true }
+              : {}),
+          })),
       },
     ];
   });
