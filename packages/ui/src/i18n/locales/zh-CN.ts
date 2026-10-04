@@ -983,6 +983,11 @@ const zhCN: Record<string, string> = {
   "canvas.hint.hand": "手型",
   "canvas.sendToChat": "发送到对话",
   "canvas.sendToChat.title": "把选中节点（或整块画布）作为附件发送到当前对话",
+  "canvas.askAgent.title": "让 Agent 扩展画布",
+  "canvas.askAgent.promptSelection":
+    "附件是当前无限画布的导出（工作区内文件：{canvasFile}）。请围绕选中的节点（{focus}）扩展相关内容，并把新增/修改的节点与连线直接写回这个 JSON 文件（保持现有结构，节点 kind 限 text/note/image）。补充要求请追加在本消息后。",
+  "canvas.askAgent.promptBoard":
+    "附件是当前无限画布的导出（工作区内文件：{canvasFile}）。请基于画布中的节点与连线关系扩展相关内容，并把新增/修改的节点与连线直接写回这个 JSON 文件（保持现有结构，节点 kind 限 text/note/image）。补充要求请追加在本消息后。",
   "whiteboard.defaultName": "画板",
   "whiteboard.nameLabel": "画板名称",
   "whiteboard.canvasLabel": "画板画布",

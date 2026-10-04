@@ -1064,6 +1064,11 @@ const enUS: Record<string, string> = {
   "canvas.hint.hand": "hand",
   "canvas.sendToChat": "Send to chat",
   "canvas.sendToChat.title": "Attach selected nodes (or the whole canvas) to the current chat",
+  "canvas.askAgent.title": "Ask agent to expand the canvas",
+  "canvas.askAgent.promptSelection":
+    "The attachment is an export of the current infinite canvas (workspace file: {canvasFile}). Expand content around the selected nodes ({focus}) and write new/updated nodes and edges back to that JSON file (keep the existing structure; node kind is limited to text/note/image). Append extra requirements after this message.",
+  "canvas.askAgent.promptBoard":
+    "The attachment is an export of the current infinite canvas (workspace file: {canvasFile}). Expand content based on the nodes and edges, and write new/updated nodes and edges back to that JSON file (keep the existing structure; node kind is limited to text/note/image). Append extra requirements after this message.",
   "whiteboard.defaultName": "Whiteboard",
   "whiteboard.nameLabel": "Whiteboard name",
   "whiteboard.canvasLabel": "Whiteboard canvas",

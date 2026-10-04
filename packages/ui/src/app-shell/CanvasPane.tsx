@@ -14,6 +14,7 @@ import {
   type CanvasNodeKind,
 } from "@/lib/canvasDocument.js";
 import { useCanvasStore } from "@/store/canvasStore.js";
+import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
 import { useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
 import { logger } from "@/logger.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
@@ -22,10 +23,10 @@ import { CanvasEdges } from "@/app-shell/canvas/CanvasEdges.js";
 import {
   CanvasContextMenu,
   CanvasControls,
-  CanvasMinimap,
   CanvasToolPalette,
   type CanvasMenuItem,
 } from "@/app-shell/canvas/CanvasOverlays.js";
+import { CanvasMinimap } from "@/app-shell/canvas/CanvasMinimap.js";
 import { CanvasSelectionToolbar } from "@/app-shell/canvas/CanvasSelectionToolbar.js";
 
 /**
@@ -79,6 +80,9 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
   const cursorModeRef = useRef(cursorMode);
   cursorModeRef.current = cursorMode;
 
+  const requestComposerTextInsert = useZCodeSessionStore(
+    (store) => store.requestComposerTextInsert,
+  );
   const doc = useCanvasStore((s) => s.docs[storageKey]);
   const session = useCanvasStore((s) => s.sessions[storageKey]);
   const nodes = doc?.nodes ?? [];
@@ -558,6 +562,38 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
     );
   }, [doc, selection, workspacePath, workspaceIdentity]);
 
+  const handleAskAgent = useCallback(() => {
+    if (!doc) return;
+    const hasSelection = selection.length > 0;
+    const file = createCanvasChatFile(doc, hasSelection ? selection : undefined);
+    const focusNodes = hasSelection ? nodes.filter((n) => selection.includes(n.id)) : nodes;
+    const focusTitles = focusNodes
+      .map((n) => n.title || n.kind)
+      .filter(Boolean)
+      .slice(0, 6)
+      .join("、");
+    const prompt = intl.formatMessage(
+      { id: hasSelection ? "canvas.askAgent.promptSelection" : "canvas.askAgent.promptBoard" },
+      { canvasFile: canvasFilePath, focus: focusTitles || "—" },
+    );
+    // T1 通道：附件进对话；T3：提示词经 composerTextInsertRequest 预填输入框（可编辑后发送）。
+    window.dispatchEvent(
+      new CustomEvent(ADD_CANVAS_TO_CHAT_EVENT, {
+        detail: { workspacePath, workspaceIdentity, files: [file] },
+      }),
+    );
+    requestComposerTextInsert(workspacePath, prompt, workspaceIdentity);
+  }, [
+    canvasFilePath,
+    doc,
+    intl,
+    nodes,
+    requestComposerTextInsert,
+    selection,
+    workspaceIdentity,
+    workspacePath,
+  ]);
+
   const backgroundMenuItems = (worldX: number, worldY: number): CanvasMenuItem[] => {
     const nodeKinds: { kind: CanvasNodeKind; key: string }[] = [
       { kind: "text", key: "canvas.node.text" },
@@ -800,6 +836,8 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
         onFitView={() => store.getState().fitView({ storageKey, rect: paneRect })}
         onSendToChat={handleSendToChat}
         sendDisabled={!nodes.length}
+        onAskAgent={handleAskAgent}
+        askDisabled={!nodes.length}
       />
 
       <CanvasMinimap
