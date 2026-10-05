@@ -56,17 +56,15 @@ export function buildRegistryModelSelectGroups(
         // 稀疏 personal overlay 会把 supportsText=false 与基线相等的叶子剥掉，
         // 因此判定「显式声明生图/生视频且未显式声明文本输出」即排除。
         items: provider.models
-          .filter(({ modelId, config }) => {
-            // 临时诊断：确认过滤函数收到的输出模态事实（验证后移除）
-            console.log(
-              "[canvas-debug]",
-              modelId,
-              JSON.stringify(config.properties?.outputFormat ?? null),
-            );
+          .filter(({ config }) => {
             const outputFormat = config.properties?.outputFormat;
             if (!outputFormat) return true;
-            if (outputFormat.supportsText === true) return true;
-            return outputFormat.supportsImage !== true && outputFormat.supportsVideo !== true;
+            // 声明了生图/生视频输出能力的模型是生成模型：即便内置 catch-all 规则
+            // 叠加了 supportsText: true，输出模态意图仍权威，从聊天选择器排除。
+            if (outputFormat.supportsImage === true || outputFormat.supportsVideo === true) {
+              return false;
+            }
+            return outputFormat.supportsText !== false;
           })
           .map(({ modelId, config }) => ({
             key: `registry-provider:${provider.providerId}:${modelId}`,

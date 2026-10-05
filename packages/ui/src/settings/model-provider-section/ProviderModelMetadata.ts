@@ -442,6 +442,15 @@ function buildPersonalProperties({
   if (Object.keys(input).length > 0) result.inputFormat = input;
   else delete result.inputFormat;
   const output = { ...current?.outputFormat } as Record<string, unknown>;
+  // 用户在编辑器取消「文本」输出时必须显式落 false：内置 catch-all 规则会给
+  // openai 兼容供应商的模型叠加 supportsText: true，稀疏缺省会让该意图被覆盖。
+  applyInteractiveSparseLeaf(
+    output,
+    "supportsText",
+    effective.outputFormat?.supportsText,
+    currentEffective?.outputFormat?.supportsText,
+    inherited?.outputFormat?.supportsText,
+  );
   applyInteractiveSparseLeaf(
     output,
     "supportsImage",
