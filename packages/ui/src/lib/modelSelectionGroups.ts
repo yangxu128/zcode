@@ -53,9 +53,21 @@ export function buildRegistryModelSelectGroups(
         ...(accountPresentation ? { directItems: true } : {}),
         // 生图/生视频等非文本输出模型不是聊天模型（docs/ui/provider-model-output-modality.md），
         // 不进入聊天模型选择器；否则选择后必然产生无法完成的对话请求。
-        // supportsText 未设置（旧数据/内置规则）按聊天模型处理。
+        // 稀疏 personal overlay 会把 supportsText=false 与基线相等的叶子剥掉，
+        // 因此判定「显式声明生图/生视频且未显式声明文本输出」即排除。
         items: provider.models
-          .filter(({ config }) => config.properties?.outputFormat?.supportsText !== false)
+          .filter(({ modelId, config }) => {
+            // 临时诊断：确认过滤函数收到的输出模态事实（验证后移除）
+            console.log(
+              "[canvas-debug]",
+              modelId,
+              JSON.stringify(config.properties?.outputFormat ?? null),
+            );
+            const outputFormat = config.properties?.outputFormat;
+            if (!outputFormat) return true;
+            if (outputFormat.supportsText === true) return true;
+            return outputFormat.supportsImage !== true && outputFormat.supportsVideo !== true;
+          })
           .map(({ modelId, config }) => ({
             key: `registry-provider:${provider.providerId}:${modelId}`,
             value: encodeCustomModelValue(provider.providerId, modelId),

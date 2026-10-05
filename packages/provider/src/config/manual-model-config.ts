@@ -8,10 +8,15 @@ import {
 
 const complete = completeModelConfigDataSchema.shape;
 // 手动模式只冻结产品明确开放的叶子；新增系统字段默认不属于个人手动配置。
+// properties 内的 inputFormat / outputFormat 与外层 optionSpecs 都整体可省略：
+// 生图/生视频等非文本输出模型没有推理档位与文本输出上限，personal overlay
+// 可能不含这些块，extract/clear 不能因此拒收（docs/ui/provider-model-output-modality.md）。
 export const manualModelConfigSchema = completeModelConfigDataSchema
   .pick({ enabled: true })
   .extend({
     enabled: modelConfigDataSchema.shape.enabled,
+    // 白名单语义是「允许编辑什么」而非「必须有什么」：非文本输出模型的
+    // personal overlay 可能缺布尔叶/optionSpecs，全部放宽为可选。
     properties: complete.properties
       .pick({
         contextWindow: true,
@@ -20,24 +25,27 @@ export const manualModelConfigSchema = completeModelConfigDataSchema
         supportsMidConversationSystem: true,
       })
       .extend({
-        inputFormat: complete.properties.shape.inputFormat.pick({
-          supportsImage: true,
-          supportsVideo: true,
-          supportsPdf: true,
-        }),
-      }),
-    // 生图/生视频等非文本输出模型没有推理档位与文本输出上限，
-    // 手动模式的 optionSpecs 叶子整体可省略（docs/ui/provider-model-output-modality.md）。
+        inputFormat: complete.properties.shape.inputFormat
+          .pick({
+            supportsImage: true,
+            supportsVideo: true,
+            supportsPdf: true,
+          })
+          .optional(),
+        outputFormat: complete.properties.shape.outputFormat.optional(),
+      })
+      .partial(),
     optionSpecs: z
       .object({
         reasoningLevel: completeEnumOptionSpecDataSchema.pick({ values: true }).extend({
-          map: completeEnumOptionSpecDataSchema.shape.map,
+          map: completeEnumOptionSpecDataSchema.shape.map.optional(),
         }),
         maxOutputTokens: completeLimitOptionSpecDataSchema.pick({
           max: true,
         }),
       })
-      .partial(),
+      .partial()
+      .optional(),
   });
 
 export type ManualModelConfig = z.infer<typeof manualModelConfigSchema>;

@@ -88,15 +88,29 @@ export function serializeRegistryModelConfig(
         supportsAudio: config.properties.inputFormat.supportsAudio,
         supportsPdf: config.properties.inputFormat.supportsPdf,
       },
-      outputFormat: { supportsText: config.properties.outputFormat.supportsText },
+      outputFormat: {
+        supportsText: config.properties.outputFormat.supportsText,
+        ...(config.properties.outputFormat.supportsImage === undefined
+          ? {}
+          : { supportsImage: config.properties.outputFormat.supportsImage }),
+        ...(config.properties.outputFormat.supportsVideo === undefined
+          ? {}
+          : { supportsVideo: config.properties.outputFormat.supportsVideo }),
+      },
       supportsToolCall: config.properties.supportsToolCall,
       supportsJsonSchemaOutput: config.properties.supportsJsonSchemaOutput,
       supportsNativeWebSearch: config.properties.supportsNativeWebSearch,
       supportsMidConversationSystem: config.properties.supportsMidConversationSystem,
     },
+    // 生图/生视频等非文本输出模型的 optionSpecs 内部字段可省略
+    // （docs/ui/provider-model-output-modality.md）。
     optionSpecs: {
-      reasoningLevel: config.optionSpecs.reasoningLevel,
-      maxOutputTokens: config.optionSpecs.maxOutputTokens,
+      ...(config.optionSpecs.reasoningLevel == null
+        ? {}
+        : { reasoningLevel: config.optionSpecs.reasoningLevel }),
+      ...(config.optionSpecs.maxOutputTokens == null
+        ? {}
+        : { maxOutputTokens: config.optionSpecs.maxOutputTokens }),
     },
   };
 }
