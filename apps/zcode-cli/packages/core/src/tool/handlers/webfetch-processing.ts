@@ -12,6 +12,7 @@ import { truncateContentForModel } from "./webfetch-content.js";
 import { webFetchError } from "./webfetch-errors.js";
 import { traceFromContext } from "./webfetch-trace.js";
 import type { CachedFetchContent } from "./webfetch-types.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 
 interface WebFetchProcessingOptions {
   preapprovedUrl?: boolean;
@@ -69,7 +70,7 @@ export async function processFetchedContent(
           tools: [],
           options: {
             ...auxiliaryModelOptions(model),
-            maxOutputTokens: Math.min(4096, model.optionSpecs.maxOutputTokens.max),
+            maxOutputTokens: Math.min(4096, modelMaxOutputTokens(model, 4096)),
           },
           abortSignal: context.abortSignal,
         }),

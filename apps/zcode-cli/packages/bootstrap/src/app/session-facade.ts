@@ -349,7 +349,7 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
     listThoughtLevels: () => {
       const registryState = currentRegistrySelection();
       return registryState.owned
-        ? [...(registryState.selection?.model.config.optionSpecs.reasoningLevel.values ?? [])]
+        ? [...(registryState.selection?.model.config.optionSpecs?.reasoningLevel?.values ?? [])]
         : [];
     },
     listMcpServers: async () =>

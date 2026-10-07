@@ -9,6 +9,7 @@ import {
   runWithModelInvocationContext,
   traceContextToLogContext,
 } from "../deps.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import type {
   GoalCompletionVerificationOutput,
   Model,
@@ -340,7 +341,7 @@ async function generateTargetCompletionVerificationText(
           abortSignal: input.abortSignal,
           messages: input.messages,
           // Verifier 继承已绑定的思考配置，不能套用低成本辅助调用的降档和封顶策略。
-          options: { maxOutputTokens: input.model.optionSpecs.maxOutputTokens.max },
+          options: { maxOutputTokens: modelMaxOutputTokens(input.model) },
           tools: [],
         }),
       );

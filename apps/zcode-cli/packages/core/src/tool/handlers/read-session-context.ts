@@ -17,6 +17,7 @@ import {
   type SessionInfo,
   type TraceContext,
 } from "@zcode/contracts";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import {
   buildSessionContextMaterial,
   formatLocalSessionNotFound,
@@ -338,7 +339,7 @@ async function generateLiteExtraction(input: {
           ...auxiliaryModelOptions(model),
           maxOutputTokens: Math.min(
             Math.min(input.maxOutputTokens, READ_SESSION_CONTEXT_MAX_TOKENS),
-            model.optionSpecs.maxOutputTokens.max,
+            modelMaxOutputTokens(model),
           ),
         },
         abortSignal: input.context.abortSignal,

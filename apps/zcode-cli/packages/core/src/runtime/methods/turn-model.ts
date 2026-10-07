@@ -11,6 +11,7 @@ import { cloneModelSelection } from "../model-selection.js";
 import { createRefreshRuntimeHeadersBeforeModelAttempt } from "./model-runtime-headers.js";
 import { createRuntimeModel, withModelInvocationContext } from "./runtime-model.js";
 import { applyRuntimeExecutionState } from "../execution-state.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 
 export function createTurnModel(
   runtime: AgentRuntimeInternal,
@@ -63,7 +64,7 @@ export async function applySubmissionExecutionState(
           modelSelection: appliedSelection,
           effectiveReasoningLevel: model.options.reasoningLevel,
           previousModelSelection: previousSelection,
-          supportedThoughtLevels: model.optionSpecs.reasoningLevel.values,
+          supportedThoughtLevels: modelReasoningValues(model),
           traceContext,
         });
       }

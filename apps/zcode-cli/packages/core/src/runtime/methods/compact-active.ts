@@ -18,6 +18,7 @@ import {
 } from "../deps.js";
 import type { SessionEvent, TraceContext } from "../deps.js";
 import { resolveModelRequestSessionTypeFromTaskType } from "./model-request-session-type.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import {
   defaultCompactPhaseForTrigger,
   defaultCompactReasonForTrigger,
@@ -176,7 +177,7 @@ async function compactActiveConversationImpl(
     createRuntimeModel(this, {
       selection: this.getSessionModelSelection(),
     });
-  const executionMaxOutputTokens = compactModel.optionSpecs.maxOutputTokens.max;
+  const executionMaxOutputTokens = modelMaxOutputTokens(compactModel);
   // Active compact 会跨多个 await 保留这份成员浅快照；它依赖 RuntimeMessageEntry
   // 不可变约定。selection、provider render 和最终 replace 会创建各自拥有的副本，
   // 禁止在 compact 期间原地修改 activeEntries 内共享的 entry/message/content。
@@ -717,9 +718,9 @@ function capCompactSummaryMaxOutputTokens(model: Model): number {
   // Compact 是独立执行链，在这里显式选择模型上限与 summary 20K 上限中的较小值。
   const desired = Math.min(
     resolveNormalRequestMaxOutputTokens({
-      modelMaxOutputTokens: model.optionSpecs.maxOutputTokens.max,
+      modelMaxOutputTokens: modelMaxOutputTokens(model),
     }),
     MAX_OUTPUT_TOKENS_FOR_SUMMARY,
   );
-  return Math.min(desired, model.optionSpecs.maxOutputTokens.max);
+  return Math.min(desired, modelMaxOutputTokens(model));
 }

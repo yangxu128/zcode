@@ -178,13 +178,25 @@ export class AiSdkModelExecution {
     readonly modelId: string;
     readonly providerConfig: RegistryProviderConfig;
     readonly supportsJsonSchemaOutput: boolean;
-    readonly optionSpecs: {
-      readonly reasoningLevel: { readonly map: string };
-      readonly maxOutputTokens: { readonly map: string };
+    // 生图/生视频等非文本输出模型可省略 optionSpecs
+    // （docs/ui/provider-model-output-modality.md）：不编译 option map，
+    // 请求期携带生成选项会被拒绝。
+    readonly optionSpecs?: {
+      readonly reasoningLevel?: { readonly map: string };
+      readonly maxOutputTokens?: { readonly map: string };
     };
   }): AiSdkBoundModelResolution {
     const snapshot = this.captureModelSnapshot(input);
-    const optionMaps = compileModelOptionMaps(input.optionSpecs);
+    const optionMaps =
+      input.optionSpecs?.reasoningLevel?.map != null &&
+      input.optionSpecs.maxOutputTokens?.map != null
+        ? compileModelOptionMaps(
+            input.optionSpecs as {
+              readonly reasoningLevel: { readonly map: string };
+              readonly maxOutputTokens: { readonly map: string };
+            },
+          )
+        : undefined;
     return {
       // 这里只构造不执行请求的基础 Model；真正请求必须通过 resolveRequest 绑定完整 options。
       resolved: this.resolveSnapshot(snapshot, undefined, undefined, undefined),
