@@ -12,6 +12,7 @@ import type { AgentRuntimeInternal } from "../internal.js";
 import { createRuntimeModel } from "./runtime-model.js";
 import { createRefreshRuntimeHeadersBeforeModelAttempt } from "./model-runtime-headers.js";
 import { recordModelUsageFact } from "./usage-observability.js";
+import { modelMaxOutputTokens } from "../../model/option-specs.js";
 
 export interface SampleModelInput {
   request: McpAppsSamplingParams;
@@ -82,7 +83,7 @@ export async function sampleModel(
           abortSignal: signal,
           messages,
           options: {
-            maxOutputTokens: Math.min(params.maxTokens, model.optionSpecs.maxOutputTokens.max),
+            maxOutputTokens: Math.min(params.maxTokens, modelMaxOutputTokens(model)),
           },
         }),
     );

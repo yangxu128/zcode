@@ -48,7 +48,6 @@ import {
   resolveRegistryThoughtLevel,
   type ResolvedRegistrySelection,
 } from "./provider-registry-selection.js";
-import { isClosableSessionStore } from "./session-store.js";
 import { createSubagentObservation } from "./subagent-observation.js";
 import type { PrepareUserExecutionBoundary, ZCodeApp } from "./types.js";
 import type { CliDefaultSelection } from "./cli-default-selection.js";

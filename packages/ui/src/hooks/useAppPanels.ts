@@ -83,7 +83,6 @@ import {
   type WorkspaceSidePaneState,
   type WorkspaceSidePaneTab,
 } from "@/lib/workspaceSidePane.js";
-import { isSidePaneTabVisibleForParent } from "@/lib/workspaceSidePane.js";
 import { openCanvasSidePane } from "@/lib/workspaceSidePane.js";
 import { buildCanvasBoardId } from "@/lib/canvasDocument.js";
 import { openPluginUiSidePane } from "@/plugin-ui/index.js";

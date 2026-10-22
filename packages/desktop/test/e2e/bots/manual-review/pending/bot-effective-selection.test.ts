@@ -101,6 +101,8 @@ describe("BOT-E2E-SR87 有效选择", () => {
                   reasoningLevel: {
                     ...model.config.optionSpecs.reasoningLevel,
                     values: ["low", "high", "max"],
+                    // 生成/非文本模型允许没有推理档位（optionSpecs 可缺），fixture 补一个合法 map。
+                    map: model.config.optionSpecs.reasoningLevel?.map ?? "reasoningLevel",
                   },
                 },
               },

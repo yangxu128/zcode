@@ -1607,6 +1607,7 @@ const enUS: Record<string, string> = {
   "sidePane.pluginUi": "Plugin",
   "whiteboard.title": "Whiteboard",
   "canvas.title": "Infinite canvas",
+  "canvas.launcher.description": "Arrange images, videos and prompts on a canvas",
   "canvas.node.text": "Text",
   "canvas.node.note": "Note",
   "canvas.node.image": "Image",

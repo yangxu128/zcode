@@ -821,6 +821,7 @@ export function AnimatedSidePanePanel({
     canvas: {
       id: "canvas",
       label: intl.formatMessage({ id: "canvas.title" }),
+      description: intl.formatMessage({ id: "canvas.launcher.description" }),
       icon: FrameIcon,
       onOpen: onOpenCanvasTab,
     },

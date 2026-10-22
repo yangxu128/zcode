@@ -1482,6 +1482,7 @@ const zhCN: Record<string, string> = {
   "sidePane.pluginUi": "插件",
   "whiteboard.title": "画板",
   "canvas.title": "无限画布",
+  "canvas.launcher.description": "在画布上组织图片、视频与提示词",
   "canvas.node.text": "文本",
   "canvas.node.note": "便签",
   "canvas.node.image": "图片",

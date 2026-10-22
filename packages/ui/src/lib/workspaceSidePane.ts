@@ -1217,6 +1217,7 @@ export function isSidePaneTabVisibleInScope(
     case "model-trajectory":
     case "new-tab":
     case "terminal":
+    case "canvas":
       return sidePaneOwnerKey(tab.ownerTaskId) === sidePaneOwnerKey(scope.ownerTaskId);
   }
 }
