@@ -118,6 +118,10 @@ import {
   zcodeProviderRuntimeHeadersRequestParamsSchema,
   zcodeProviderRefreshRegistryResultSchema,
   zcodeProviderTestModelConnectivityResultSchema,
+  zcodeWorkspaceGenerateImageResultSchema,
+  zcodeWorkspaceSaveGeneratedMediaResultSchema,
+  zcodeWorkspaceStartVideoResultSchema,
+  zcodeWorkspaceVideoTaskResultSchema,
   zcodeOfficialMcpAuthHeadersRequestParamsSchema,
   summarizeOfficialMcpIdentityHeaders,
   zcodeProtocolEmptyResultSchema,
@@ -208,6 +212,10 @@ import type {
   ZCodeAgentInstallPluginParams,
   ZCodeAgentGenerateWorkspaceTextParams,
   ZCodeAgentTestModelConnectivityParams,
+  ZCodeAgentGenerateWorkspaceImageParams,
+  ZCodeAgentSaveGeneratedMediaParams,
+  ZCodeAgentStartWorkspaceVideoParams,
+  ZCodeAgentWorkspaceVideoTaskParams,
   ZCodeAgentGoalParams,
   ZCodeAgentGrantWorkspaceHookTrustParams,
   ZCodeAgentInitializeResult,
@@ -5306,6 +5314,85 @@ export function createZCodeAgentService(
           selection: params.selection,
         },
         zcodeProviderTestModelConnectivityResultSchema,
+        { signal: params.signal },
+      );
+    },
+
+    async generateWorkspaceImage(params: ZCodeAgentGenerateWorkspaceImageParams) {
+      const client = await getClient(params);
+      await ensureAccountProviderConfigSynced({
+        client,
+        reason: "provider_generate_workspace_image",
+        workspace: params,
+      });
+      return client.request(
+        zcodeProtocolMethods.workspaceGenerateImage,
+        {
+          workspace: buildWorkspaceRef(params),
+          prompt: params.prompt,
+          ...(params.size === undefined ? {} : { size: params.size }),
+          ...(params.ratio === undefined ? {} : { ratio: params.ratio }),
+          ...(params.image === undefined ? {} : { image: [...params.image] }),
+          ...(params.model === undefined ? {} : { model: params.model }),
+        },
+        zcodeWorkspaceGenerateImageResultSchema,
+        // 生图分钟级：调用方透传自身 deadline，否则协议默认超时先触发。
+        {
+          signal: params.signal,
+          ...(params.requestTimeoutMs ? { timeoutMs: params.requestTimeoutMs } : {}),
+        },
+      );
+    },
+
+    async saveWorkspaceGeneratedMedia(params: ZCodeAgentSaveGeneratedMediaParams) {
+      const client = await getClient(params);
+      return client.request(
+        zcodeProtocolMethods.workspaceSaveGeneratedMedia,
+        {
+          workspace: buildWorkspaceRef(params),
+          url: params.url,
+        },
+        zcodeWorkspaceSaveGeneratedMediaResultSchema,
+        { signal: params.signal },
+      );
+    },
+
+    async startWorkspaceVideo(params: ZCodeAgentStartWorkspaceVideoParams) {
+      const client = await getClient(params);
+      await ensureAccountProviderConfigSynced({
+        client,
+        reason: "provider_start_video",
+        workspace: params,
+      });
+      return client.request(
+        zcodeProtocolMethods.workspaceStartVideo,
+        {
+          workspace: buildWorkspaceRef(params),
+          prompt: params.prompt,
+          ...(params.seconds === undefined ? {} : { seconds: params.seconds }),
+          ...(params.aspectRatio === undefined ? {} : { aspectRatio: params.aspectRatio }),
+          ...(params.firstFrame === undefined ? {} : { firstFrame: params.firstFrame }),
+          ...(params.model === undefined ? {} : { model: params.model }),
+        },
+        zcodeWorkspaceStartVideoResultSchema,
+        {
+          signal: params.signal,
+          ...(params.requestTimeoutMs ? { timeoutMs: params.requestTimeoutMs } : {}),
+        },
+      );
+    },
+
+    async getWorkspaceVideoTask(params: ZCodeAgentWorkspaceVideoTaskParams) {
+      const client = await getClient(params);
+      return client.request(
+        zcodeProtocolMethods.workspaceVideoTask,
+        {
+          workspace: buildWorkspaceRef(params),
+          providerId: params.providerId,
+          modelId: params.modelId,
+          videoId: params.videoId,
+        },
+        zcodeWorkspaceVideoTaskResultSchema,
         { signal: params.signal },
       );
     },

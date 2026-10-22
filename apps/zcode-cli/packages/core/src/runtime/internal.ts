@@ -1,3 +1,4 @@
+import type { GenerationPort } from "@zcode/contracts";
 import { PermissionService, ToolScheduler } from "./deps.js";
 import type {
   Logger,
@@ -125,6 +126,7 @@ export interface AgentRuntimeInternal
 
   dynamicWorkflowRunPort?: DynamicWorkflowRunPort;
   modelCatalogPort?: ModelCatalogPort;
+  generationPort?: GenerationPort;
   runtimeTaskRegistry: RuntimeTaskRegistry;
   /**
    * 「run 还欠着决定、主代理闲着」的提醒钟（methods/dynamic-workflow-blocked-reminder.ts）。真实 runtime 上

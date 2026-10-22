@@ -5,6 +5,7 @@ import {
   getAutoCompactThreshold,
   traceContextToLogContext,
 } from "../deps.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import type {
   AutoCompactPolicyConfig,
   LocalMicrocompactPolicyConfig,
@@ -40,7 +41,7 @@ export async function microcompactIfNeeded(
     contextWindow: context.model.properties.contextWindow,
     ...this.config.compact,
     maxOutputTokens: resolveNormalRequestMaxOutputTokens({
-      modelMaxOutputTokens: context.model.optionSpecs.maxOutputTokens.max,
+      modelMaxOutputTokens: modelMaxOutputTokens(context.model),
     }),
     modelContextBudgetStrategy: this.config.modelContextBudgetStrategy,
   };

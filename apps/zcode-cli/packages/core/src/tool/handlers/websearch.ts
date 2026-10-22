@@ -25,6 +25,7 @@ import type { ToolEntry, ToolHandler } from "../types.js";
 import { auxiliaryModelOptions } from "../../model/auxiliary-model-options.js";
 import { buildWebSearchOutput, formatWebSearchModelContent } from "./websearch-results.js";
 import { webSearchTraceFromContext } from "./websearch-support.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 
 const WEBSEARCH_TOOL_NAME = "WebSearch";
 const PROVIDER_WEBSEARCH_TOOL_NAME = "web_search";
@@ -95,7 +96,7 @@ const webSearchHandler: ToolHandler<WebSearchInput, WebSearchOutput> = async (in
     // 这里保持自动选择，依靠单工具请求和 prompt 触发 provider-native 搜索。
     options: {
       ...auxiliaryModelOptions(model),
-      maxOutputTokens: Math.min(4096, model.optionSpecs.maxOutputTokens.max),
+      maxOutputTokens: Math.min(4096, modelMaxOutputTokens(model, 4096)),
     },
     abortSignal: context.abortSignal,
   };

@@ -5430,7 +5430,10 @@ export function SessionPane({
       }
       blockingRequestId={blockingInteractionId}
       listenAddToChatEvents={focused}
-      externalTextInsertRequest={focused && sessionId === null ? composerTextInsertRequest : null}
+      // 工作区级文本预填（Example Prompt / 画布 askAgent）：focused 纪律保证只有
+      // 当前聚焦的 composer 消费一次；不再限 root（sessionId === null），否则
+      // 任务会话里的预填（画布让 Agent 扩展）永远无人消费。
+      externalTextInsertRequest={focused ? composerTextInsertRequest : null}
       onExternalTextInsertApplied={handleExternalTextInsertApplied}
       autoFocusEnabled={focused}
       disabled={

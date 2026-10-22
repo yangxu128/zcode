@@ -3,6 +3,7 @@ import { getTurnTools } from "./turn-tool-visibility.js";
 import { isOffPeakUserTakeover, refreshOffPeakTurnAfterTakeover } from "../off-peak/turn.js";
 
 import { beginLocalTurnPreparation } from "@zcode/contracts";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import {
   CompactTrigger,
   CoreErrorType,
@@ -163,7 +164,7 @@ async function runModelBackedTurnStepImpl(
   const executionModelSelection = { providerId: model.providerId, modelId: model.modelId };
   // 请求预算由 Agent 执行链显式决定。普通 Turn 选择打满模型声明的上限，
   // ModelFactory 不再把该请求参数伪装成长期 ModelSelection/Active Model 状态。
-  const executionMaxOutputTokens = model.optionSpecs.maxOutputTokens.max;
+  const executionMaxOutputTokens = modelMaxOutputTokens(model);
   const executionContextWindow = model.properties.contextWindow;
   const modelTraceContext = createChildTraceContext(state.turnTraceContext, {
     attributes: {

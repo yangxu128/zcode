@@ -43,15 +43,16 @@ export function createModelCatalogPort(deps: ModelCatalogPortDeps): ModelCatalog
       const current = deps.currentSelection();
       return view.providers.flatMap((provider) =>
         provider.models.map((model): ModelCatalogEntry => {
-          const reasoning = model.config.optionSpecs.reasoningLevel;
+          const reasoning = model.config.optionSpecs?.reasoningLevel;
+          // 生图/生视频等非文本输出模型没有档位表：空数组 + 无默认。
           // 档位表**复制**而不是原样递出：注册表的 values 是 readonly 视图的一部分，
           // 端口契约给的是一个普通可读数组，让调用方拿到一份不会随注册表变动的副本。
-          const reasoningLevels = [...reasoning.values];
+          const reasoningLevels = [...(reasoning?.values ?? [])];
           // 默认档位 = 最后一档，与 provider-registry-selection.ts 的 `toModelOption`
           // （GUI picker 的 `reasoning.defaultLevel`）**同一条规则**。两处给出不同的默认，
           // 就会出现「picker 里默认 high、`subagent_model` 不写档位时默认 low」这种只有用户
           // 会发现的偏差。没有档位的模型整个字段缺席（空数组 + 无默认）。
-          const defaultReasoningLevel = reasoning.values.at(-1);
+          const defaultReasoningLevel = reasoning?.values.at(-1);
           const contextWindow = model.config.properties.contextWindow;
           // `providerName` 在注册表里是 `string | null | undefined`（config-service.ts 把空串
           // 归一成 `null`），而端口契约上是 `string | undefined`。三种「没名字」在这里合成

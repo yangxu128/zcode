@@ -2528,6 +2528,129 @@ export type ZCodeProviderTestModelConnectivityResult = z.infer<
   typeof zcodeProviderTestModelConnectivityResultSchema
 >;
 
+/**
+ * 画布节点内生成（docs/ui/canvas-pane.md T4）：UI 只交意图与参数，生成模型由宿主
+ * 按注册表候选顺序解析，凭据不进协议参数。
+ */
+export const zcodeWorkspaceGenerateImageParamsSchema = z
+  .object({
+    workspace: zcodeWorkspaceRefSchema,
+    prompt: nonEmptyString,
+    /** 档位（1K/2K/3K/4K）或精确尺寸；缺席由服务端默认。 */
+    size: nonEmptyString.optional(),
+    ratio: nonEmptyString.optional(),
+    /** 图生图/多图合成的参考图（URL 或工作区文件路径）。 */
+    image: z.array(nonEmptyString).optional(),
+    /** 点名的生成模型 `providerId/modelId`；缺席时按候选顺序回退。 */
+    model: nonEmptyString.optional(),
+  })
+  .strict();
+export const zcodeGeneratedImageSchema = z
+  .object({
+    url: nonEmptyString.optional(),
+    /** 已落盘到工作区的图片（相对路径）；与 url 二选一。 */
+    savedPath: nonEmptyString.optional(),
+  })
+  .strict();
+export const zcodeWorkspaceGenerateImageResultSchema = z
+  .object({
+    /** 实际命中的 `providerId/modelId`，供节点回填与排查。 */
+    model: nonEmptyString,
+    images: z.array(zcodeGeneratedImageSchema),
+  })
+  .strict();
+export type ZCodeWorkspaceGenerateImageParams = z.infer<
+  typeof zcodeWorkspaceGenerateImageParamsSchema
+>;
+export type ZCodeWorkspaceGenerateImageResult = z.infer<
+  typeof zcodeWorkspaceGenerateImageResultSchema
+>;
+
+/** 把生成端临时外链落到工作区（画布 T6）；图片与视频共用。 */
+export const zcodeWorkspaceSaveGeneratedMediaParamsSchema = z
+  .object({
+    workspace: zcodeWorkspaceRefSchema,
+    url: nonEmptyString,
+  })
+  .strict();
+export const zcodeWorkspaceSaveGeneratedMediaResultSchema = z
+  .object({
+    savedPath: nonEmptyString,
+    reused: z.boolean(),
+  })
+  .strict();
+export type ZCodeWorkspaceSaveGeneratedMediaParams = z.infer<
+  typeof zcodeWorkspaceSaveGeneratedMediaParamsSchema
+>;
+export type ZCodeWorkspaceSaveGeneratedMediaResult = z.infer<
+  typeof zcodeWorkspaceSaveGeneratedMediaResultSchema
+>;
+
+/** 视频节点：创建任务与查询任务分离，任务身份由节点持久化以支持跨刷新恢复。 */
+export const zcodeWorkspaceStartVideoParamsSchema = z
+  .object({
+    workspace: zcodeWorkspaceRefSchema,
+    prompt: nonEmptyString,
+    /** 时长秒数字符串（4–12）。 */
+    seconds: nonEmptyString.optional(),
+    aspectRatio: nonEmptyString.optional(),
+    /** 首帧（URL 或 data URI）；提供时按 keyframe 模式创建。 */
+    firstFrame: nonEmptyString.optional(),
+    model: nonEmptyString.optional(),
+  })
+  .strict();
+/**
+ * 创建与查询共用的冷却上限：再长的 Retry-After 也不该让画布节点无限转圈，
+ * 超时判定另有阈值（画布 30 分钟）。声明在使用它的两个 schema 之前。
+ */
+const VIDEO_TASK_RETRY_AFTER_MAX_MS = 120_000;
+/**
+ * 创建结果二选一，语义由宿主按 HTTP 状态/错误码判定：
+ * created 拿 videoId 去查；queued 表示服务商这次没收（限流/繁忙/连不上），
+ * 客户端按 retryAfterMs 自动重投，不要把它当失败展示给用户。
+ */
+export const zcodeWorkspaceStartVideoResultSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("created"),
+      model: nonEmptyString,
+      providerId: nonEmptyString,
+      modelId: nonEmptyString,
+      videoId: nonEmptyString,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("queued"),
+      reason: nonEmptyString,
+      retryAfterMs: z.number().int().min(0).max(VIDEO_TASK_RETRY_AFTER_MAX_MS),
+    })
+    .strict(),
+]);
+export const zcodeWorkspaceVideoTaskParamsSchema = z
+  .object({
+    workspace: zcodeWorkspaceRefSchema,
+    providerId: nonEmptyString,
+    modelId: nonEmptyString,
+    videoId: nonEmptyString,
+  })
+  .strict();
+export const zcodeWorkspaceVideoTaskResultSchema = z.discriminatedUnion("status", [
+  // retryAfterMs：被限流/服务端繁忙时宿主给出的「下次查询不早于」建议（docs/ui/canvas-pane.md T5）。
+  z
+    .object({
+      status: z.literal("running"),
+      retryAfterMs: z.number().int().min(0).max(VIDEO_TASK_RETRY_AFTER_MAX_MS).optional(),
+    })
+    .strict(),
+  z.object({ status: z.literal("completed"), url: nonEmptyString }).strict(),
+  z.object({ status: z.literal("failed"), detail: nonEmptyString.optional() }).strict(),
+]);
+export type ZCodeWorkspaceStartVideoParams = z.infer<typeof zcodeWorkspaceStartVideoParamsSchema>;
+export type ZCodeWorkspaceStartVideoResult = z.infer<typeof zcodeWorkspaceStartVideoResultSchema>;
+export type ZCodeWorkspaceVideoTaskParams = z.infer<typeof zcodeWorkspaceVideoTaskParamsSchema>;
+export type ZCodeWorkspaceVideoTaskResult = z.infer<typeof zcodeWorkspaceVideoTaskResultSchema>;
+
 export const zcodeProviderUpdateAccountConfigParamsSchema = z
   .object({
     revision: nonEmptyString,
@@ -4161,6 +4284,11 @@ export const zcodeProtocolMethods = {
   workspaceGenerateText: "workspace/generateText",
   workspaceCancelGenerateText: "workspace/cancelGenerateText",
   providerTestModelConnectivity: "provider/testModelConnectivity",
+  // 画布节点内生成：执行面在 CLI 宿主（凭据只在宿主），UI 经 services 调用。
+  workspaceGenerateImage: "workspace/generateImage",
+  workspaceSaveGeneratedMedia: "workspace/saveGeneratedMedia",
+  workspaceStartVideo: "workspace/startVideo",
+  workspaceVideoTask: "workspace/videoTask",
   mcpList: "mcp/list",
   mcpReadResource: "mcp/readResource",
   mcpUiOpenInstance: "mcp/uiOpenInstance",

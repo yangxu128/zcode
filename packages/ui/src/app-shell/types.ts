@@ -336,6 +336,7 @@ export interface WorkspaceShellLayoutProps extends Omit<AppProps, "baseFeedbackS
   handleOpenBrowserTab: () => void;
   handleOpenBrowserPermissionSettings: (origin: string) => void;
   handleOpenWhiteboard: () => void;
+  handleOpenCanvasTab: () => void;
   handleOpenDeveloperTools: () => void;
   handleOpenFileManager: (target?: FileManagerTarget) => void;
   handleNavigateFileManager: (tabId: string, source: CodeViewerSource) => void;

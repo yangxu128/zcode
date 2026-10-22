@@ -12,6 +12,7 @@ import {
   hasEnoughMessagesToCompact,
   shouldAutoCompact,
 } from "../deps.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import type {
   AutoCompactPolicyConfig,
   AutoCompactTokenOverride,
@@ -194,7 +195,7 @@ export async function autoCompactIfNeeded(
     contextWindow: context.model.properties.contextWindow,
     ...this.config.compact,
     maxOutputTokens: resolveNormalRequestMaxOutputTokens({
-      modelMaxOutputTokens: context.model.optionSpecs.maxOutputTokens.max,
+      modelMaxOutputTokens: modelMaxOutputTokens(context.model),
     }),
     modelContextBudgetStrategy: this.config.modelContextBudgetStrategy,
   };

@@ -6,6 +6,7 @@ export type OpenTabLauncherItemId =
   | "review"
   | "terminal"
   | "browser"
+  | "canvas"
   | "developer-tools";
 
 export function resolveOpenTabLauncherItemIds({
@@ -34,6 +35,8 @@ export function resolveOpenTabLauncherItemIds({
   if (canOpenSelectionSideConversation) {
     itemIds.push("selection-side-conversation");
   }
+
+  itemIds.push("canvas");
 
   if (developerToolsEnabled) {
     itemIds.push("developer-tools");

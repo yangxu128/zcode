@@ -67,6 +67,9 @@ export class ToolExecutorImpl implements ToolExecutor {
       dynamicWorkflowRunPort: options.dynamicWorkflowRunPort,
       dynamicWorkflowSnippetPort: options.dynamicWorkflowSnippetPort,
       modelCatalogPort: options.modelCatalogPort,
+      // 生成端口要一路带到 ToolExecutionContext：options → deps → context 三处逐字段
+      // 拷贝，漏任何一处 ImageGenerate 都会误报 generation_unavailable。
+      generationPort: options.generationPort,
       runtimeTaskRegistry: options.runtimeTaskRegistry,
       readFileState: options.readFileState ?? new Map(),
       hasLoadedSkill: options.hasLoadedSkill,
