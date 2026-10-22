@@ -1,3 +1,4 @@
+import { sampleModel } from "./sample-model.js";
 import { grantPermissionFullAccess } from "../permission-full-access.js";
 import {
   getSessionShellSelection,
@@ -24,6 +25,7 @@ import { getPendingPermissionRequests } from "./config.js";
 import { recordUserInputAutoResolutionUpdate } from "./interaction-auto-resolution.js";
 import { recordDynamicWorkflowRunProgress } from "./dynamic-workflow-run-progress.js";
 import { trackResumedDynamicWorkflowRun } from "./dynamic-workflow-run-track.js";
+import { activateDynamicWorkflowTools } from "./dynamic-workflow-activation.js";
 import { startSavedWorkflowRun } from "./dynamic-workflow-run-start.js";
 import { amendWorkflowRunSettings } from "./dynamic-workflow-run-settings.js";
 import { getProjection } from "./config.js";
@@ -79,7 +81,7 @@ import { createContextBuilderFromSnapshot } from "./context.js";
 import { loadProjectMemoryRoot } from "./context.js";
 import { logMemorySkipped } from "./context.js";
 import { injectPluginReferenceReminderFromTurn } from "./plugin-reference.js";
-import { initializeMcp } from "./mcp.js";
+import { initializeMcp, refreshMcpToolsIfChanged } from "./mcp.js";
 import { startMcpStartup } from "./mcp.js";
 import { discoverSkillsForContext } from "./context.js";
 import { createConfigOnlyContextSnapshot } from "./context.js";
@@ -186,14 +188,6 @@ import { recordPendingModelChange } from "./timeline-persistence.js";
 import { persistPendingModelChangeTimeline } from "./timeline-persistence.js";
 import { persistAssistantTimelinePartForSession } from "./timeline-persistence.js";
 import { generateWorkspaceText, testModelConnectivity } from "./workspace-generate-text.js";
-import {
-  generateWorkspaceImage,
-  saveWorkspaceGeneratedMedia,
-} from "./workspace-generate-image.js";
-import {
-  getWorkspaceVideoTask,
-  startWorkspaceVideo,
-} from "./workspace-generate-video.js";
 import { maybeStartGoalSummaryTitleGeneration } from "./goal-summary-title.js";
 import { maybeStartSessionTitleGenerationFromExternalInput } from "./session-title.js";
 import { setCustomSessionTitle } from "./session-title.js";
@@ -223,10 +217,6 @@ export function installAgentRuntimeMethods(ctor: AgentRuntimeConstructor): void 
   proto.setCustomSessionTitle = setCustomSessionTitle;
   proto.maybeStartGoalSummaryTitleGeneration = maybeStartGoalSummaryTitleGeneration;
   proto.testModelConnectivity = testModelConnectivity;
-proto.generateWorkspaceImage = generateWorkspaceImage;
-proto.saveWorkspaceGeneratedMedia = saveWorkspaceGeneratedMedia;
-proto.startWorkspaceVideo = startWorkspaceVideo;
-proto.getWorkspaceVideoTask = getWorkspaceVideoTask;
   proto.recordExternalUserPrompt = recordExternalUserPrompt;
   proto.getActiveTurnInfo = getActiveTurnInfo;
   proto.getTools = getTools;
@@ -242,6 +232,7 @@ proto.getWorkspaceVideoTask = getWorkspaceVideoTask;
   proto.recordUserInputAutoResolutionUpdate = recordUserInputAutoResolutionUpdate;
   proto.recordDynamicWorkflowRunProgress = recordDynamicWorkflowRunProgress;
   proto.trackResumedDynamicWorkflowRun = trackResumedDynamicWorkflowRun;
+  proto.activateDynamicWorkflowTools = activateDynamicWorkflowTools;
   proto.startSavedWorkflowRun = startSavedWorkflowRun;
   proto.amendWorkflowRunSettings = amendWorkflowRunSettings;
   proto.getProjection = getProjection;
@@ -294,6 +285,7 @@ proto.getWorkspaceVideoTask = getWorkspaceVideoTask;
   proto.logMemorySkipped = logMemorySkipped;
   proto.injectPluginReferenceReminderFromTurn = injectPluginReferenceReminderFromTurn;
   proto.initializeMcp = initializeMcp;
+  proto.refreshMcpToolsIfChanged = refreshMcpToolsIfChanged;
   proto.startMcpStartup = startMcpStartup;
   proto.discoverSkillsForContext = discoverSkillsForContext;
   proto.createConfigOnlyContextSnapshot = createConfigOnlyContextSnapshot;
@@ -397,6 +389,7 @@ proto.getWorkspaceVideoTask = getWorkspaceVideoTask;
   proto.persistPart = persistPart;
   proto.rebuildProjection = rebuildProjection;
   proto.generateWorkspaceText = generateWorkspaceText;
+  proto.sampleModel = sampleModel;
   proto.drainMemoryExtractions = drainMemoryExtractions;
   proto.isProjectMemoryEnabled = isProjectMemoryEnabled;
 }

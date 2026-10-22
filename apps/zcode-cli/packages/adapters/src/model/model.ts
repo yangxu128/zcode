@@ -24,6 +24,7 @@ export interface ModelExecutor {
 }
 
 export interface CreateModelOptions {
+  requestCapabilities?: Model["requestCapabilities"];
   providerId: ModelProviderId;
   modelId: ModelId;
   displayName?: string;
@@ -38,6 +39,7 @@ export function createModel(input: CreateModelOptions): Model {
 }
 
 class ExecutableModel implements Model {
+  readonly requestCapabilities?: Model["requestCapabilities"];
   readonly providerId: ModelProviderId;
   readonly modelId: ModelId;
   readonly displayName?: string;
@@ -47,6 +49,7 @@ class ExecutableModel implements Model {
   private readonly executor: ModelExecutor;
 
   constructor(input: CreateModelOptions) {
+    this.requestCapabilities = input.requestCapabilities;
     this.providerId = input.providerId;
     this.modelId = input.modelId;
     this.displayName = input.displayName;
@@ -59,6 +62,7 @@ class ExecutableModel implements Model {
   bind(options?: ModelOptions): Model {
     if (!options || Object.keys(options).length === 0) return this;
     return new ExecutableModel({
+      requestCapabilities: this.requestCapabilities,
       providerId: this.providerId,
       modelId: this.modelId,
       displayName: this.displayName,
@@ -82,6 +86,7 @@ class ExecutableModel implements Model {
     validateRequestProperties(this.properties, request);
     const requestOptions = request.options ?? {};
     return {
+      toolSearchEnabled: request.toolSearchEnabled,
       messages: request.messages,
       tools: request.tools,
       responseJsonSchema: request.responseJsonSchema,
@@ -94,52 +99,31 @@ class ExecutableModel implements Model {
 }
 
 function freezeOptionSpecs(specs: ModelOptionSpecs): ModelOptionSpecs {
-  // 生图/生视频等非文本输出模型可以没有 optionSpecs
-  // （docs/ui/provider-model-output-modality.md），按缺省原样保留。
   return Object.freeze({
-    ...(specs.maxOutputTokens
-      ? { maxOutputTokens: Object.freeze({ ...specs.maxOutputTokens }) }
-      : {}),
-    ...(specs.reasoningLevel
-      ? {
-          reasoningLevel: Object.freeze({
-            ...specs.reasoningLevel,
-            values: Object.freeze([...specs.reasoningLevel.values]),
-          }),
-        }
-      : {}),
+    maxOutputTokens: Object.freeze({ ...specs.maxOutputTokens }),
+    reasoningLevel: Object.freeze({
+      ...specs.reasoningLevel,
+      values: Object.freeze([...specs.reasoningLevel.values]),
+    }),
   });
 }
 
 function validateOptions(specs: ModelOptionSpecs, options: ModelOptions): Required<ModelOptions> {
-  const maxSpec = specs.maxOutputTokens;
-  const reasoningSpec = specs.reasoningLevel;
-  if (!maxSpec || !reasoningSpec) {
-    // 无 optionSpecs 的模型不接受任何生成选项。
-    if (options.maxOutputTokens !== undefined || options.reasoningLevel !== undefined) {
-      throw invalidRequest("model does not support reasoning/maxOutputTokens options", {
-        options,
-      });
-    }
-    return {
-      maxOutputTokens: undefined,
-      reasoningLevel: undefined,
-    } as unknown as Required<ModelOptions>;
-  }
   const maxOutputTokens = options.maxOutputTokens;
   if (
     maxOutputTokens === undefined ||
     !Number.isInteger(maxOutputTokens) ||
     maxOutputTokens <= 0 ||
-    maxOutputTokens > maxSpec.max
+    maxOutputTokens > specs.maxOutputTokens.max
   ) {
     throw invalidRequest("maxOutputTokens is outside the model option range", {
       maxOutputTokens,
-      spec: maxSpec,
+      spec: specs.maxOutputTokens,
     });
   }
 
   const reasoningLevel = options.reasoningLevel;
+  const reasoningSpec = specs.reasoningLevel;
   if (reasoningLevel === undefined || !reasoningSpec.values.includes(reasoningLevel)) {
     throw invalidRequest("reasoningLevel is not supported by the model", {
       reasoningLevel,
@@ -151,34 +135,23 @@ function validateOptions(specs: ModelOptionSpecs, options: ModelOptions): Requir
 }
 
 function validatePartialOptions(specs: ModelOptionSpecs, options: ModelOptions): ModelOptions {
-  const maxSpec = specs.maxOutputTokens;
-  const reasoningSpec = specs.reasoningLevel;
-  // 无 optionSpecs 的模型：拒绝任何生成选项，其余原样保留。
-  if (!maxSpec || !reasoningSpec) {
-    if (options.maxOutputTokens !== undefined || options.reasoningLevel !== undefined) {
-      throw invalidRequest("model does not support reasoning/maxOutputTokens options", {
-        options,
-      });
-    }
-    return { ...options };
-  }
   const maxOutputTokens = options.maxOutputTokens;
   if (
     maxOutputTokens !== undefined &&
     (!Number.isInteger(maxOutputTokens) ||
       maxOutputTokens <= 0 ||
-      maxOutputTokens > maxSpec.max)
+      maxOutputTokens > specs.maxOutputTokens.max)
   ) {
     throw invalidRequest("maxOutputTokens is outside the model option range", {
       maxOutputTokens,
-      spec: maxSpec,
+      spec: specs.maxOutputTokens,
     });
   }
   const reasoningLevel = options.reasoningLevel;
-  if (reasoningLevel !== undefined && !reasoningSpec.values.includes(reasoningLevel)) {
+  if (reasoningLevel !== undefined && !specs.reasoningLevel.values.includes(reasoningLevel)) {
     throw invalidRequest("reasoningLevel is not supported by the model", {
       reasoningLevel,
-      values: reasoningSpec.values,
+      values: specs.reasoningLevel.values,
     });
   }
   return { ...options };

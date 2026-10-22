@@ -25,7 +25,6 @@ import type { ToolEntry, ToolHandler } from "../types.js";
 import { auxiliaryModelOptions } from "../../model/auxiliary-model-options.js";
 import { buildWebSearchOutput, formatWebSearchModelContent } from "./websearch-results.js";
 import { webSearchTraceFromContext } from "./websearch-support.js";
-import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 
 const WEBSEARCH_TOOL_NAME = "WebSearch";
 const PROVIDER_WEBSEARCH_TOOL_NAME = "web_search";
@@ -96,7 +95,7 @@ const webSearchHandler: ToolHandler<WebSearchInput, WebSearchOutput> = async (in
     // 这里保持自动选择，依靠单工具请求和 prompt 触发 provider-native 搜索。
     options: {
       ...auxiliaryModelOptions(model),
-      maxOutputTokens: Math.min(4096, modelMaxOutputTokens(model, 4096)),
+      maxOutputTokens: Math.min(4096, model.optionSpecs.maxOutputTokens.max),
     },
     abortSignal: context.abortSignal,
   };
@@ -115,7 +114,6 @@ const webSearchHandler: ToolHandler<WebSearchInput, WebSearchOutput> = async (in
           toolName: WEBSEARCH_TOOL_NAME,
           querySource: "web_search_tool",
         },
-        modelRequestSessionType: "other",
         modelCall: { operation: "web_search" },
         // statusSink 不在这里设：执行器交出的 context.model 已带默认会话事件出口。
         traceContext: webSearchTraceFromContext(context),
@@ -131,7 +129,9 @@ export const webSearchToolEntry: ToolEntry = {
   ...WEBSEARCH_TOOL_CONTRACT,
   providerNative: undefined,
   metadata: {
+    shouldDefer: true,
     name: WEBSEARCH_TOOL_NAME,
+    searchHint: "search the web for current information",
     // 写死月份会导致模型可见的 WebSearch 描述过期。
     // 每次读取时重新生成，避免长驻进程跨月后继续投递旧月份。
     get description() {

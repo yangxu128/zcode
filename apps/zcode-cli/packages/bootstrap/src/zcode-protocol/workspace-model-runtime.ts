@@ -3,10 +3,6 @@ import { createInMemorySessionEventStore } from "@zcode/adapters/storage";
 import type { ModelSelection } from "@zcode/contracts";
 import {
   zcodeProviderTestModelConnectivityParamsSchema,
-  zcodeWorkspaceGenerateImageParamsSchema,
-  zcodeWorkspaceSaveGeneratedMediaParamsSchema,
-  zcodeWorkspaceStartVideoParamsSchema,
-  zcodeWorkspaceVideoTaskParamsSchema,
   zcodeWorkspaceReadPresentationParamsSchema,
   type ZCodeWorkspaceRef,
 } from "@zcode/shared";
@@ -19,6 +15,8 @@ import {
 } from "./server-types.js";
 import { runSessionModelConfigMutation } from "../zcode-protocol-v4/model-config-mutation.js";
 import { createProviderRuntimeHeadersPort } from "./provider-runtime-headers.js";
+import { offPeakLifecycleNotificationSchema } from "@zcode/shared";
+import { V4_NOTIFICATIONS } from "@zcode/shared/zcode-protocol-v4";
 
 export async function readWorkspacePresentation(
   context: ZCodeProtocolAgentServerContext,
@@ -47,105 +45,24 @@ export async function testProviderModelConnectivity(
   // 旧 Personal Config 跨进程 watcher 可能永久漏掉原子写事件；连接测试若不先
   // 主动刷新，会反复查询旧 Registry。这里复用正式 Registry refresh，不旁路创建配置事实。
   await context.deps.refreshProviderRegistry?.("provider-connectivity");
-  return withWorkspaceApp(context, params.workspace, async (app) => {
+  const active = Array.from(context.sessions.values()).find(
+    (record) => record.workspace.workspaceKey === params.workspace.workspaceKey,
+  );
+  const app =
+    active?.app ??
+    (await createWorkspaceZCodeApp(context, params.workspace, {
+      env: context.deps.env,
+      eventStore: createInMemorySessionEventStore(),
+      runtimeConfig: { workingDirectory: params.workspace.workspacePath },
+      sessionStore: context.deps.sessionStore,
+      version: context.deps.version,
+    }));
+  try {
     await app.testModelConnectivity(
       { selection: params.selection as ModelSelection },
       { abortSignal },
     );
     return { success: true as const };
-  });
-}
-
-export async function generateWorkspaceImage(
-  context: ZCodeProtocolAgentServerContext,
-  rawParams: unknown,
-  abortSignal?: AbortSignal,
-) {
-  const params = parseParams(zcodeWorkspaceGenerateImageParamsSchema, rawParams);
-  // 刚在模型设置里添加的生图模型要立刻可用：与连接测试同样先刷新进程 Registry。
-  await context.deps.refreshProviderRegistry?.("provider-generate-image");
-  return withWorkspaceApp(context, params.workspace, (app) =>
-    app.generateWorkspaceImage(
-      {
-        prompt: params.prompt,
-        ...(params.size === undefined ? {} : { size: params.size }),
-        ...(params.ratio === undefined ? {} : { ratio: params.ratio }),
-        ...(params.image === undefined ? {} : { image: params.image }),
-        ...(params.model === undefined ? {} : { model: params.model }),
-      },
-      { abortSignal },
-    ),
-  );
-}
-
-export async function saveWorkspaceGeneratedMedia(
-  context: ZCodeProtocolAgentServerContext,
-  rawParams: unknown,
-) {
-  const params = parseParams(zcodeWorkspaceSaveGeneratedMediaParamsSchema, rawParams);
-  return withWorkspaceApp(context, params.workspace, (app) =>
-    app.saveWorkspaceGeneratedMedia({ url: params.url }),
-  );
-}
-
-export async function startWorkspaceVideo(
-  context: ZCodeProtocolAgentServerContext,
-  rawParams: unknown,
-  abortSignal?: AbortSignal,
-) {
-  const params = parseParams(zcodeWorkspaceStartVideoParamsSchema, rawParams);
-  await context.deps.refreshProviderRegistry?.("provider-start-video");
-  return withWorkspaceApp(context, params.workspace, (app) =>
-    app.startWorkspaceVideo(
-      {
-        prompt: params.prompt,
-        ...(params.seconds === undefined ? {} : { seconds: params.seconds }),
-        ...(params.aspectRatio === undefined ? {} : { aspectRatio: params.aspectRatio }),
-        ...(params.firstFrame === undefined ? {} : { firstFrame: params.firstFrame }),
-        ...(params.model === undefined ? {} : { model: params.model }),
-      },
-      { abortSignal },
-    ),
-  );
-}
-
-export async function getWorkspaceVideoTask(
-  context: ZCodeProtocolAgentServerContext,
-  rawParams: unknown,
-) {
-  const params = parseParams(zcodeWorkspaceVideoTaskParamsSchema, rawParams);
-  return withWorkspaceApp(context, params.workspace, (app) =>
-    app.getWorkspaceVideoTask({
-      providerId: params.providerId,
-      modelId: params.modelId,
-      videoId: params.videoId,
-    }),
-  );
-}
-
-/**
- * 按 workspaceKey 复用活跃会话的 app；没有活跃会话时临时创建一个并在调用结束后关闭。
- * 连接测试与节点内生成共用这条路径，避免两处各自装配 app 而漂移出不同副作用。
- */
-async function withWorkspaceApp<T>(
-  context: ZCodeProtocolAgentServerContext,
-  workspace: ZCodeWorkspaceRef,
-  run: (app: ZCodeApp) => Promise<T>,
-): Promise<T> {
-  const active = Array.from(context.sessions.values()).find(
-    (record) => record.workspace.workspaceKey === workspace.workspaceKey,
-  );
-  const app =
-    active?.app ??
-    (await createWorkspaceZCodeApp(context, workspace, {
-      env: context.deps.env,
-      eventStore: createInMemorySessionEventStore(),
-      runtimeConfig: { workingDirectory: workspace.workspacePath },
-      sessionStore: context.deps.sessionStore,
-      version: context.deps.version,
-    }));
-  try {
-    return await run(app);
   } finally {
     if (!active) await app.close?.();
   }
@@ -160,6 +77,12 @@ export async function createWorkspaceZCodeApp(
     options.providerRuntimeHeadersPort ?? createProviderRuntimeHeadersPort(context, workspace);
   return context.deps.createZCodeApp({
     ...options,
+    onOffPeakLifecycleEvent: (event) =>
+      context.notify({
+        method: V4_NOTIFICATIONS.offPeakLifecycle,
+        params: offPeakLifecycleNotificationSchema.parse(event),
+      }),
+    includeVisualize: true,
     platform: context.deps.platform,
     providerRuntimeHeadersPort,
     runtimeConfig: {

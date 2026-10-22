@@ -1,5 +1,4 @@
 import type { Model, ModelOptions } from "@zcode/contracts";
-import { modelMaxOutputTokens, modelReasoningValues } from "./option-specs.js";
 
 const AUXILIARY_MAX_OUTPUT_TOKENS = 5_000;
 
@@ -9,7 +8,7 @@ const AUXILIARY_MAX_OUTPUT_TOKENS = 5_000;
  */
 export function auxiliaryModelOptions(model: Model): Required<ModelOptions> {
   return {
-    reasoningLevel: modelReasoningValues(model)[0]!,
-    maxOutputTokens: Math.min(AUXILIARY_MAX_OUTPUT_TOKENS, modelMaxOutputTokens(model, AUXILIARY_MAX_OUTPUT_TOKENS)),
+    reasoningLevel: model.optionSpecs.reasoningLevel.values[0]!,
+    maxOutputTokens: Math.min(AUXILIARY_MAX_OUTPUT_TOKENS, model.optionSpecs.maxOutputTokens.max),
   };
 }

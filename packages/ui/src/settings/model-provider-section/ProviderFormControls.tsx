@@ -4,7 +4,6 @@ import type { ModelConnectivityResult } from "@zcode/shared";
 import { Loader2Icon, Trash2, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { ModelInputCapabilityBadge } from "@/components/ModelInputCapabilityBadge.js";
-import { ModelOutputCapabilityBadge } from "@/components/ModelOutputCapabilityBadge.js";
 import { Switch } from "@/components/ui/switch.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useProviderModelDraft } from "@/settings/model-provider-section/useProviderModelDraft.js";
@@ -68,7 +67,6 @@ export function ModelRowInput({
     | "contextWindow"
     | "maxOutputTokens"
     | "inputFormat"
-    | "outputFormat"
     | "reasoningLevelValues"
     | "reasoningLevelMap"
     | null
@@ -239,7 +237,6 @@ export function ModelRowInput({
     model.config.properties?.contextWindow ?? 0,
     locale,
   );
-  const outputFormat = model.config.properties?.outputFormat;
   const contextWindowAccessibleLabel = intl.formatMessage(
     { id: "settings.modelProvider.contextWindowBadgeLabel" },
     { value: contextWindowLabel },
@@ -269,8 +266,6 @@ export function ModelRowInput({
           ) ? (
             <ModelInputCapabilityBadge />
           ) : null}
-          {outputFormat?.supportsImage ? <ModelOutputCapabilityBadge kind="image" /> : null}
-          {outputFormat?.supportsVideo ? <ModelOutputCapabilityBadge kind="video" /> : null}
         </div>
         {shouldShowTestButton ? (
           <Button

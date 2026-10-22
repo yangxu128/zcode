@@ -57,17 +57,7 @@ export const completeModelInputFormatDataSchema = z
     supportsPdf: z.boolean(),
   })
   .strict();
-/**
- * 输出格式。supportsText 之外的模态（生图/生视频）为向后兼容的可选扩展：
- * 旧配置缺省按 false 语义（docs/ui/provider-model-output-modality.md）。
- */
-export const completeModelOutputFormatDataSchema = z
-  .object({
-    supportsText: z.boolean(),
-    supportsImage: z.boolean().optional(),
-    supportsVideo: z.boolean().optional(),
-  })
-  .strict();
+export const completeModelOutputFormatDataSchema = z.object({ supportsText: z.boolean() }).strict();
 export const modelInputFormatDataSchema = z
   .object(sparseShape(completeModelInputFormatDataSchema.shape))
   .strict();
@@ -95,15 +85,10 @@ export const modelPropertiesDataSchema = z
   })
   .strict();
 
-/**
- * optionSpecs 的完整形状。生图/生视频等非文本输出模型可以同时省略
- * reasoningLevel 与 maxOutputTokens（它们没有推理档位与文本输出上限，
- * docs/ui/provider-model-output-modality.md）；消费方须容忍缺失。
- */
 export const completeModelOptionSpecsDataSchema = z
   .object({
-    reasoningLevel: completeEnumOptionSpecDataSchema.optional(),
-    maxOutputTokens: completeLimitOptionSpecDataSchema.optional(),
+    reasoningLevel: completeEnumOptionSpecDataSchema,
+    maxOutputTokens: completeLimitOptionSpecDataSchema,
   })
   .strict();
 export const modelOptionSpecsDataSchema = z

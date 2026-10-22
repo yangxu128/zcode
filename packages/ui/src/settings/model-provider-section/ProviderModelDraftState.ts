@@ -9,7 +9,6 @@ const CONFIG_VALUE_FIELDS = [
   "supportsJsonSchemaOutputValue",
   "supportsNativeWebSearchValue",
   "supportsMidConversationSystemValue",
-  "supportsToolCallValue",
   "reasoningLevelValuesValue",
 ] as const;
 
@@ -25,11 +24,7 @@ export function projectModelDraft(
     config: model.inheritedConfig ?? model.config,
   });
   const explicit = new Set(draft.overriddenFieldsValue ?? []);
-  const next = {
-    ...draft,
-    inputFormatValue: { ...draft.inputFormatValue },
-    outputFormatValue: { ...draft.outputFormatValue },
-  };
+  const next = { ...draft, inputFormatValue: { ...draft.inputFormatValue } };
   for (const field of CONFIG_VALUE_FIELDS) {
     if (!explicit.has(field)) Object.assign(next, { [field]: defaults[field] });
   }
@@ -38,13 +33,6 @@ export function projectModelDraft(
   ) as (keyof typeof next.inputFormatValue)[]) {
     if (!explicit.has(`inputFormatValue.${field}`))
       next.inputFormatValue[field] = defaults.inputFormatValue[field];
-  }
-  for (const field of Object.keys(
-    next.outputFormatValue,
-  ) as (keyof typeof next.outputFormatValue)[]) {
-    if (!explicit.has(`outputFormatValue.${field}`))
-      // 生图/生视频是可选扩展字段，缺省统一按 false 语义物化成显式布尔。
-      next.outputFormatValue[field] = Boolean(defaults.outputFormatValue[field]);
   }
   return next;
 }
@@ -83,14 +71,6 @@ export function updateModelDraft(
     ) as (keyof typeof patch.inputFormatValue)[]) {
       if (patch.inputFormatValue[field] !== draft.inputFormatValue[field])
         explicit.add(`inputFormatValue.${field}`);
-    }
-  }
-  if (patch.outputFormatValue) {
-    for (const field of Object.keys(
-      patch.outputFormatValue,
-    ) as (keyof typeof patch.outputFormatValue)[]) {
-      if (patch.outputFormatValue[field] !== draft.outputFormatValue[field])
-        explicit.add(`outputFormatValue.${field}`);
     }
   }
   return { ...draft, ...patch, overriddenFieldsValue: [...explicit] };

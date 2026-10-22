@@ -77,15 +77,6 @@ export interface IFileService {
     transform: "sync-gitignore" | "reset-defaults";
   }): Promise<{ content: string }>;
   writeWorkspaceFileSearchIgnore(params: { rootPath: string; content: string }): Promise<void>;
-  /**
-   * 受控文本写入：宿主侧原子落盘（临时文件 + 重命名），父目录自动创建。
-   * 与 readTextFile 同信任域（绝对路径、宿主进程直接 fs）；内容上限 4MB。
-   * 用途：画布等 UI 功能把文档写到工作区文件，让 agent 用既有文件工具读写。
-   */
-  writeWorkspaceTextFile(params: {
-    path: string;
-    content: string;
-  }): Promise<{ path: string; bytesWritten: number }>;
 }
 
 export const IFileService = createServiceDescriptor<IFileService>(ServiceChannels.File);

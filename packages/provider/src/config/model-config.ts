@@ -152,9 +152,6 @@ export type ModelOutputFormatConfigInput = Readonly<z.infer<typeof modelOutputFo
 
 export class ModelOutputFormatConfig extends ConfigOverlay<ModelOutputFormatConfig> {
   readonly supportsText?: ModelOutputFormatConfigInput["supportsText"];
-  // 生图/生视频输出模态（可选扩展，docs/ui/provider-model-output-modality.md）。
-  readonly supportsImage?: ModelOutputFormatConfigInput["supportsImage"];
-  readonly supportsVideo?: ModelOutputFormatConfigInput["supportsVideo"];
 
   constructor(input: ModelOutputFormatConfigInput = {}) {
     super();
@@ -165,8 +162,6 @@ export class ModelOutputFormatConfig extends ConfigOverlay<ModelOutputFormatConf
   overlay(next: ModelOutputFormatConfig): ModelOutputFormatConfig {
     return new ModelOutputFormatConfig({
       supportsText: this.overlayValue(this.supportsText, next.supportsText),
-      supportsImage: this.overlayValue(this.supportsImage, next.supportsImage),
-      supportsVideo: this.overlayValue(this.supportsVideo, next.supportsVideo),
     });
   }
 
@@ -175,11 +170,7 @@ export class ModelOutputFormatConfig extends ConfigOverlay<ModelOutputFormatConf
   }
 
   toJSON(): ModelOutputFormatConfigInput {
-    return objectWithoutUndefined({
-      supportsText: this.supportsText,
-      supportsImage: this.supportsImage,
-      supportsVideo: this.supportsVideo,
-    });
+    return objectWithoutUndefined({ supportsText: this.supportsText });
   }
 }
 

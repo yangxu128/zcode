@@ -4,7 +4,6 @@ import {
   runWithModelInvocationContext,
   traceContextToLogContext,
 } from "../deps.js";
-import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import type {
   ModelInputMessage,
   ModelSelection,
@@ -55,20 +54,13 @@ export async function testModelConnectivity(
   input: ModelConnectivityTestInput,
   options?: { abortSignal?: AbortSignal; traceContext?: TraceContext },
 ): Promise<void> {
-  const baseModel = createRuntimeModel(this, { selection: input.selection });
+  const baseModel = createRuntimeModel(this, { selection: input.selection, scope: "workspace" });
   // 连接探测不需要生成正文；复用辅助生成的 5,000 预算会等待多余推理和输出。
   // 独立限制为 1 Token，仍使用最低公开档位，不改变其他辅助调用的预算。
-  // 生图/生视频等非文本输出模型没有 optionSpecs：不做选项降档，直接用基础 Model 探测。
-  // 这类模型的连接测试现在由宿主 GenerationPort 按模态探测生成端点，不走到这里
-  // （docs/agents/image-video-generation.md）；此处保留缺省，避免无档位 Model 被误降档。
-  const reasoningValues = modelReasoningValues(baseModel);
-  const model =
-    reasoningValues.length > 0
-      ? baseModel.bind({
-          reasoningLevel: reasoningValues[0]!,
-          maxOutputTokens: CONNECTIVITY_PROBE_MAX_OUTPUT_TOKENS,
-        })
-      : baseModel;
+  const model = baseModel.bind({
+    reasoningLevel: baseModel.optionSpecs.reasoningLevel.values[0]!,
+    maxOutputTokens: CONNECTIVITY_PROBE_MAX_OUTPUT_TOKENS,
+  });
   const traceContext = createChildTraceContext(options?.traceContext ?? this.rootTraceContext, {
     attributes: {
       providerId: String(model.providerId),
@@ -89,7 +81,6 @@ export async function testModelConnectivity(
   await runWithModelInvocationContext(
     {
       metadata: traceContextToLogContext(traceContext),
-      modelRequestSessionType: "other",
       modelCall: { operation: "workspace_generate_text" },
       statusSink: this.createModelStatusSink(traceContext, []),
       traceContext,
@@ -152,7 +143,7 @@ async function generateWorkspaceTextImpl(
   assertWorkspaceModelInput(input);
   const requestedSelection = input.selection;
   const querySource = input.querySource.trim() || "workspace_generate_text";
-  const baseModel = createRuntimeModel(this, { selection: requestedSelection });
+  const baseModel = createRuntimeModel(this, { selection: requestedSelection, scope: "workspace" });
   // 辅助请求需要的是最低公开档位，不是扫描 off/nothink 等名称后强制关闭。
   const model =
     querySource === GIT_COMMIT_MESSAGE_QUERY_SOURCE
@@ -206,7 +197,6 @@ async function generateWorkspaceTextImpl(
   const result = await runWithModelInvocationContext(
     {
       metadata: traceContextToLogContext(modelTraceContext),
-      modelRequestSessionType: "other" as const,
       modelCall: {
         operation:
           querySource === GIT_COMMIT_MESSAGE_QUERY_SOURCE

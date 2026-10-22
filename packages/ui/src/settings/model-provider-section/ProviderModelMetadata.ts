@@ -1,6 +1,6 @@
 /* oxlint-disable eslint(max-lines) -- Model Config 弹窗的 Draft、校验与稀疏 Overlay 必须共享同一字段映射，避免 UI 产生第二套规则。 */
 import type { ProviderSettingsFormModel } from "@/lib/providerSettingsFormTypes.js";
-import type { ModelInputFormatData, ModelOutputFormatData } from "@zcode/shared/model-config";
+import type { ModelInputFormatData } from "@zcode/shared/model-config";
 import {
   EnumOptionSpecConfig,
   extractManualModelConfig,
@@ -9,14 +9,12 @@ import {
 } from "@zcode/provider";
 
 export type ProviderModelInputFormatDraft = ModelInputFormatData;
-export type ProviderModelOutputFormatDraft = ModelOutputFormatData;
 
 export interface ProviderModelDraftValues {
   idValue: string;
   contextWindowValue: string;
   maxOutputTokensValue: string;
   inputFormatValue: ProviderModelInputFormatDraft;
-  outputFormatValue: ProviderModelOutputFormatDraft;
   enabledValue?: boolean;
   useRecommendedConfigValue?: boolean;
   /** 仅在本次 Draft 从固定模式切回推荐模式时清空已有 Overlay。 */
@@ -26,7 +24,6 @@ export interface ProviderModelDraftValues {
   supportsJsonSchemaOutputValue?: boolean;
   supportsNativeWebSearchValue?: boolean;
   supportsMidConversationSystemValue?: boolean;
-  supportsToolCallValue?: boolean;
   reasoningLevelValuesValue: readonly string[];
   reasoningLevelMapValue: string;
 }
@@ -40,7 +37,6 @@ export type ProviderModelDraftCommitResult =
         | "contextWindow"
         | "maxOutputTokens"
         | "inputFormat"
-        | "outputFormat"
         | "reasoningLevelValues"
         | "reasoningLevelMap";
     };
@@ -51,7 +47,6 @@ export function createProviderModelDraftValues(
   // 配置不完整时编辑器就是修复入口，不能在打开前抛错；数值保留空输入，能力控件用保守初值。
   const properties = model.config.properties ?? {};
   const inputFormat = properties?.inputFormat;
-  const outputFormat = properties?.outputFormat;
   return {
     idValue: model.modelId,
     // 编辑器只把 Personal Overlay 当作真实输入；继承值由 UI 作为 placeholder 展示。
@@ -69,11 +64,6 @@ export function createProviderModelDraftValues(
       supportsVideo: inputFormat?.supportsVideo ?? false,
       supportsAudio: inputFormat?.supportsAudio ?? false,
       supportsPdf: inputFormat?.supportsPdf ?? false,
-    },
-    outputFormatValue: {
-      supportsText: outputFormat?.supportsText ?? true,
-      supportsImage: outputFormat?.supportsImage ?? false,
-      supportsVideo: outputFormat?.supportsVideo ?? false,
     },
     enabledValue: model.config.enabled !== false,
     useRecommendedConfigValue: model.useRecommendedConfig !== false,
@@ -144,24 +134,10 @@ export function resolveProviderModelDraftCommit({
     return { status: "invalid", field: "contextWindow" };
   }
 
-  const outputSupportsText = draft.outputFormatValue.supportsText;
-  if (
-    !outputSupportsText &&
-    !draft.outputFormatValue.supportsImage &&
-    !draft.outputFormatValue.supportsVideo
-  ) {
-    // 输出模态至少一项：纯输入模型无法产生任何结果（docs/ui/provider-model-output-modality.md）。
-    return { status: "invalid", field: "outputFormat" };
-  }
-
   const maxOutputTokens = draft.maxOutputTokensValue.trim()
     ? parsePositiveIntegerDraft(draft.maxOutputTokensValue)
     : undefined;
-  // 非文本输出模型没有文本输出上限；maxOutputTokens 只对聊天输出强制。
-  if (
-    outputSupportsText &&
-    (maxOutputTokens === null || (!useRecommendedConfig && maxOutputTokens === undefined))
-  ) {
+  if (maxOutputTokens === null || (!useRecommendedConfig && maxOutputTokens === undefined)) {
     return { status: "invalid", field: "maxOutputTokens" };
   }
 
@@ -170,28 +146,24 @@ export function resolveProviderModelDraftCommit({
   }
 
   const reasoningLevelValues = draft.reasoningLevelValuesValue.map((value) => value.trim());
+  if (
+    reasoningLevelValues.length === 0 ||
+    reasoningLevelValues.some((value) => !value) ||
+    new Set(reasoningLevelValues).size !== reasoningLevelValues.length
+  ) {
+    return { status: "invalid", field: "reasoningLevelValues" };
+  }
   const inheritedReasoning = inherited?.optionSpecs?.reasoningLevel;
   const reasoningLevelMap = draft.reasoningLevelMapValue.trim();
   const effectiveReasoningMap = reasoningLevelMap || inheritedReasoning?.map;
-  // 非文本输出模型没有推理档位；留空即合法，不物化 reasoningLevel spec。
-  const requiresReasoningSpec = outputSupportsText;
-  if (requiresReasoningSpec) {
-    if (
-      reasoningLevelValues.length === 0 ||
-      reasoningLevelValues.some((value) => !value) ||
-      new Set(reasoningLevelValues).size !== reasoningLevelValues.length
-    ) {
-      return { status: "invalid", field: "reasoningLevelValues" };
-    }
-    if (
-      !effectiveReasoningMap ||
-      new EnumOptionSpecConfig({
-        values: reasoningLevelValues,
-        map: effectiveReasoningMap,
-      }).validateComplete(["optionSpecs", "reasoningLevel"]).length > 0
-    ) {
-      return { status: "invalid", field: "reasoningLevelMap" };
-    }
+  if (
+    !effectiveReasoningMap ||
+    new EnumOptionSpecConfig({
+      values: reasoningLevelValues,
+      map: effectiveReasoningMap,
+    }).validateComplete(["optionSpecs", "reasoningLevel"]).length > 0
+  ) {
+    return { status: "invalid", field: "reasoningLevelMap" };
   }
   const effectiveEnabled = draft.enabledValue ?? currentModel.config.enabled ?? true;
   const currentEffectiveEnabled = currentModel.config.enabled ?? true;
@@ -205,14 +177,8 @@ export function resolveProviderModelDraftCommit({
       supportsVideo: draft.inputFormatValue.supportsVideo,
       supportsPdf: draft.inputFormatValue.supportsPdf,
     },
-    outputFormat: {
-      supportsText: outputSupportsText,
-      supportsImage: draft.outputFormatValue.supportsImage,
-      supportsVideo: draft.outputFormatValue.supportsVideo,
-    },
-    supportsToolCall:
-      draft.supportsToolCallValue ??
-      (outputSupportsText ? (currentModel.config.properties?.supportsToolCall ?? false) : false),
+    outputFormat: currentModel.config.properties?.outputFormat,
+    supportsToolCall: currentModel.config.properties?.supportsToolCall,
     supportsJsonSchemaOutput:
       draft.supportsJsonSchemaOutputValue ??
       currentModel.config.properties?.supportsJsonSchemaOutput ??
@@ -318,14 +284,10 @@ export function resolveProviderModelDraftCommit({
     deleteMutable(sparsePersonalConfig, "optionSpecs");
   }
   const effectiveOptionSpecs = { ...currentModel.config.optionSpecs };
-  if (requiresReasoningSpec) {
-    effectiveOptionSpecs.reasoningLevel = {
-      values: [...reasoningLevelValues],
-      map: effectiveReasoningMap,
-    };
-  } else {
-    deleteMutable(effectiveOptionSpecs, "reasoningLevel");
-  }
+  effectiveOptionSpecs.reasoningLevel = {
+    values: [...reasoningLevelValues],
+    map: effectiveReasoningMap,
+  };
   if (resolvedMaxOutputSpec !== undefined) {
     effectiveOptionSpecs.maxOutputTokens = resolvedMaxOutputSpec;
   } else if (inheritedMaxOption !== undefined) {
@@ -441,32 +403,6 @@ function buildPersonalProperties({
   );
   if (Object.keys(input).length > 0) result.inputFormat = input;
   else delete result.inputFormat;
-  const output = { ...current?.outputFormat } as Record<string, unknown>;
-  // 用户在编辑器取消「文本」输出时必须显式落 false：内置 catch-all 规则会给
-  // openai 兼容供应商的模型叠加 supportsText: true，稀疏缺省会让该意图被覆盖。
-  applyInteractiveSparseLeaf(
-    output,
-    "supportsText",
-    effective.outputFormat?.supportsText,
-    currentEffective?.outputFormat?.supportsText,
-    inherited?.outputFormat?.supportsText,
-  );
-  applyInteractiveSparseLeaf(
-    output,
-    "supportsImage",
-    effective.outputFormat?.supportsImage,
-    currentEffective?.outputFormat?.supportsImage,
-    inherited?.outputFormat?.supportsImage,
-  );
-  applyInteractiveSparseLeaf(
-    output,
-    "supportsVideo",
-    effective.outputFormat?.supportsVideo,
-    currentEffective?.outputFormat?.supportsVideo,
-    inherited?.outputFormat?.supportsVideo,
-  );
-  if (Object.keys(output).length > 0) result.outputFormat = output;
-  else delete result.outputFormat;
   return result as NonNullable<ModelConfigObject["properties"]>;
 }
 

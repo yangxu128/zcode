@@ -45,7 +45,7 @@ export function completeAuxiliaryRegistryModelSelection(
   selection: ModelSelection,
 ): ModelSelection {
   const model = registry.getModel(selection.providerId, selection.modelId);
-  const reasoningLevel = model?.config.optionSpecs?.reasoningLevel?.values[0];
+  const reasoningLevel = model?.config.optionSpecs.reasoningLevel.values[0];
   if (!reasoningLevel) return selection;
   return {
     providerId: selection.providerId,
@@ -174,8 +174,8 @@ export function requireRegistryThoughtLevel(
   selection: ResolvedRegistrySelection,
   requested: string,
 ): string {
-  const spec = selection.model.config.optionSpecs?.reasoningLevel;
-  if (!spec || !spec.values.includes(requested)) {
+  const spec = selection.model.config.optionSpecs.reasoningLevel;
+  if (!spec.values.includes(requested)) {
     throw new Error(`Unsupported reasoning effort: ${requested}`);
   }
   return requested;
@@ -184,16 +184,16 @@ export function requireRegistryThoughtLevel(
 function toModelOption(provider: Provider, model: ProviderModel): ZCodeModelOption {
   const properties = model.config.properties;
   const optionSpecs = model.config.optionSpecs;
-  const reasoning = optionSpecs?.reasoningLevel;
+  const reasoning = optionSpecs.reasoningLevel;
   return {
     ref: { providerId: provider.providerId, modelId: model.modelId },
     label: model.modelId,
     providerLabel: provider.providerName ?? provider.providerId,
     contextWindow: properties.contextWindow,
-    maxOutputTokens: optionSpecs?.maxOutputTokens?.max,
+    maxOutputTokens: optionSpecs.maxOutputTokens.max,
     reasoning: {
-      levels: (reasoning?.values ?? []).map((level) => ({ value: level, label: level })),
-      defaultLevel: reasoning?.values.at(-1),
+      levels: reasoning.values.map((level) => ({ value: level, label: level })),
+      defaultLevel: reasoning.values.at(-1),
     },
     properties: {
       inputFormat: properties.inputFormat,

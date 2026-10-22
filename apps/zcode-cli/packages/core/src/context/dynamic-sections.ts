@@ -41,10 +41,7 @@ const CONTEXT_MANAGEMENT_PROMPTS = {
   ].join("\n"),
 } as const;
 
-export function buildSessionGuidanceSection(
-  toolNames: readonly string[],
-  hasSkills = false,
-): ContextSection | null {
+export function buildSessionGuidanceSection(toolNames: readonly string[], hasSkills = false): ContextSection | null {
   const tools = new Set(toolNames);
   const lines = ["# Session-specific guidance"];
 
@@ -61,20 +58,7 @@ export function buildSessionGuidanceSection(
   // }
 
   if (tools.has("Skill") && hasSkills) {
-    lines.push(
-      "- When the user types `/<skill-name>`, invoke it via Skill. Only use skills listed in the user-invocable skills section \u2014 don't guess.",
-    );
-  }
-
-  // \u751f\u56fe/\u751f\u89c6\u9891\u7684\u8def\u7531\uff1a\u6587\u672c\u6a21\u578b\u53ea\u8d1f\u8d23\u7ec4\u7ec7\u63d0\u793a\u8bcd\u4e0e\u53c2\u6570\uff0c\u76ee\u6807\u751f\u6210\u6a21\u578b\u7531\u5de5\u5177\u81ea\u5df1\u89e3\u6790\u3002
-  // \u4e0e Skill \u6bb5\u540c\u6837\u6309\u672c\u8f6e\u771f\u5b9e\u63d0\u4f9b\u7684\u5de5\u5177\u95e8\u63a7\u2014\u2014\u6ca1\u6709\u8fd9\u4e24\u4e2a\u5de5\u5177\u7684\u4f1a\u8bdd\u4e0d\u80fd\u51fa\u73b0\u8fd9\u6761\u6307\u5f15\uff0c
-  // \u5426\u5219\u4f1a\u628a\u6a21\u578b\u6307\u5411\u4e0d\u5b58\u5728\u7684\u5de5\u5177\uff1b\u5b83\u6b64\u524d\u4f1a\u56e0\u4e3a\u5de5\u5177\u63cf\u8ff0\u91cc\u6ca1\u5199\u6392\u4ed6\u8def\u7531\uff0c\u5728\u751f\u6210\u8bf7\u6c42\u4e0a
-  // \u9000\u56de\u53bb\u8c03\u6280\u80fd\u6216\u8dd1 shell \u811a\u672c\uff08docs/agents/image-video-generation.md\uff09\u3002
-  const generationToolNames = ["ImageGenerate", "VideoGenerate"].filter((name) => tools.has(name));
-  if (generationToolNames.length > 0) {
-    lines.push(
-      `- For image or video output, use ${generationToolNames.join(" / ")}: you write the prompt and pick size/ratio/duration, the tool resolves the configured generation model. Omit \`model\` unless the user names one, and don't route generation requests to a skill or shell script while these tools are available.`,
-    );
+    lines.push("- When the user types `/<skill-name>`, invoke it via Skill. Only use skills listed in the user-invocable skills section \u2014 don't guess.");
   }
 
   // if (tools.has("AskUserQuestion")) {

@@ -2,10 +2,7 @@ import { LockKeyholeIcon } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
-import type {
-  ProviderModelInputFormatDraft,
-  ProviderModelOutputFormatDraft,
-} from "@/settings/model-provider-section/ProviderModelMetadata.js";
+import type { ProviderModelInputFormatDraft } from "@/settings/model-provider-section/ProviderModelMetadata.js";
 import { modelEditorControlStyle } from "@/settings/model-provider-section/modelEditorControlStyle.js";
 import { ModelOptionCheckbox } from "@/settings/model-provider-section/ProviderModelMetadataFields.js";
 
@@ -107,71 +104,6 @@ export function ProviderModelInputModalityOptions({
                   : () => onChange({ ...value, supportsText: true, [field]: !value[field] })
               }
             />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-const OUTPUT_MODALITY_OPTIONS = ["text", "image", "video"] as const;
-
-const OUTPUT_MODALITY_FIELDS = {
-  image: "supportsImage",
-  video: "supportsVideo",
-} as const satisfies Record<Exclude<(typeof OUTPUT_MODALITY_OPTIONS)[number], "text">, string>;
-
-type VisibleOutputModelFormat = (typeof OUTPUT_MODALITY_OPTIONS)[number];
-type ProviderModelOutputFormatOverlay = Partial<
-  Record<keyof ProviderModelOutputFormatDraft, boolean | null>
->;
-
-export function ProviderModelOutputModalityOptions({
-  value,
-  onChange,
-  personalValue,
-  overrideFields,
-}: {
-  value: ProviderModelOutputFormatDraft;
-  onChange: (value: ProviderModelOutputFormatDraft) => void;
-  personalValue?: ProviderModelOutputFormatOverlay | null;
-  overrideFields?: ReadonlySet<string>;
-}) {
-  const { intl } = useZCodeIntl();
-  // 输出的生图/生视频字段是可选扩展，缺省按 false 语义。
-  const selected = {
-    text: value.supportsText,
-    image: Boolean(value.supportsImage),
-    video: Boolean(value.supportsVideo),
-  };
-  // 输出的 text 可取消勾选（生图/生视频专用模型）；至少一项由提交校验兜底。
-  return (
-    <div className="flex flex-wrap gap-2">
-      {OUTPUT_MODALITY_OPTIONS.map((modality) => {
-        const field = modality === "text" ? "supportsText" : OUTPUT_MODALITY_FIELDS[modality];
-        const overridden = overrideFields
-          ? overrideFields.has(`outputFormatValue.${field}`)
-          : personalValue?.[field] !== undefined;
-        return (
-          <div key={modality}>
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              aria-pressed={selected[modality]}
-              data-selected={selected[modality]}
-              data-personal-override={overridden}
-              data-model-output-modality={modality}
-              className={cn("gap-2 px-3", modelEditorControlStyle(overridden, selected[modality]))}
-              onClick={() => onChange({ ...value, [field]: !value[field] })}
-            >
-              <ModelOptionCheckbox selected={selected[modality]} />
-              <span>
-                {intl.formatMessage({
-                  id: `settings.modelProvider.outputModality.${modality}`,
-                })}
-              </span>
-            </Button>
           </div>
         );
       })}

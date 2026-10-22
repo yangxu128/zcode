@@ -3,18 +3,22 @@ import { useRef, type CSSProperties } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  FrameIcon,
+  FolderOpenIcon,
+  PuzzleIcon,
   BotIcon,
   BotMessageSquareIcon,
   BugIcon,
+  FileIcon,
   FileCode2Icon,
   FileDiffIcon,
   MapIcon,
   MessageSquareTextIcon,
   ListTreeIcon,
+  PlugIcon,
   NotepadTextIcon,
   PackageIcon,
   PaletteIcon,
+  ShieldCheckIcon,
   SquareTerminalIcon,
   TerminalIcon,
   WaypointsIcon,
@@ -265,11 +269,15 @@ function isDiffPreviewTab(tab: WorkspaceSidePaneTab): boolean {
 }
 
 export function SidePaneTabIcon({ tab }: { tab: WorkspaceSidePaneTab }) {
+  if (tab.type === "file-manager") return <FolderOpenIcon className="size-3.5" />;
   // plan-detail tab 由 switch-mode（ExitPlanMode）工具调用卡片打开，来源卡片
   // 用 NotepadTextIcon；tab 必须与来源一致，避免点击后图标跳变。不用 ListChecksIcon：
   // 那会与状态面板 Todo section 撞图标，语义上也偏向 todo 而非计划方案文档。
   if (tab.type === "plan-detail") {
     return <NotepadTextIcon className="size-3.5" />;
+  }
+  if (tab.type === "plugin-ui") {
+    return <PlugIcon className="size-3.5" />;
   }
   // 同一条约定：来源卡片（CreateWorkflow）用 lucide Workflow，tab 必须与它一致。
   if (tab.type === "workflow-run") {
@@ -309,6 +317,10 @@ export function SidePaneTabIcon({ tab }: { tab: WorkspaceSidePaneTab }) {
     return <BrowserTabFavicon faviconUrl={tab.faviconUrl} />;
   }
 
+  if (tab.type === "browser-permissions") {
+    return <ShieldCheckIcon className="size-3.5" />;
+  }
+
   if (tab.type === "git") {
     return <FileDiffIcon className="size-3.5" />;
   }
@@ -325,6 +337,9 @@ export function SidePaneTabIcon({ tab }: { tab: WorkspaceSidePaneTab }) {
     return <WaypointsIcon className="size-3.5" />;
   }
 
+  if (tab.type === "new-tab") return <FileIcon className="size-3.5" />;
+  if (tab.type === "plugin-market") return <PuzzleIcon className="size-3.5" />;
+
   if (tab.type === "developer-tools") {
     return <BugIcon className="size-3.5" />;
   }
@@ -339,10 +354,6 @@ export function SidePaneTabIcon({ tab }: { tab: WorkspaceSidePaneTab }) {
   // 缺省（about:blank/未取到）回退地球图标。
   if (tab.type === "browser-use") {
     return <BrowserUseTabIcon tab={tab} />;
-  }
-
-  if (tab.type === "canvas") {
-    return <FrameIcon className="size-3.5 shrink-0 text-foreground-subtle" />;
   }
 
   if (tab.source.type === "patch") {
@@ -456,7 +467,7 @@ function getPatchHeaderFileDisplayTarget(patch: string): string | null {
   return null;
 }
 
-function getPatchFileDisplayTarget(source: {
+export function getPatchFileDisplayTarget(source: {
   path?: string;
   title: string;
   patch: string;
@@ -521,6 +532,10 @@ export function getSidePaneTabTitle(
     return pageTitle || formatMessage({ id: "browser.title" });
   }
 
+  if (tab.type === "browser-permissions") {
+    return formatMessage({ id: "browser.permission.settings" });
+  }
+
   if (tab.type === "git") {
     return formatMessage({ id: "sidePane.review" });
   }
@@ -533,13 +548,12 @@ export function getSidePaneTabTitle(
     return tab.title || formatMessage({ id: "whiteboard.title" });
   }
 
-  if (tab.type === "canvas") {
-    return formatMessage({ id: "canvas.title" });
-  }
-
   if (tab.type === "model-trajectory") {
     return tab.title?.trim() || formatMessage({ id: "modelTrajectory.title" });
   }
+
+  if (tab.type === "new-tab") return formatMessage({ id: "sidePane.newTab" });
+  if (tab.type === "plugin-market") return formatMessage({ id: "workspace.openPluginsSettings" });
 
   if (tab.type === "developer-tools") {
     return formatMessage({ id: "developerTools.title" });
@@ -556,5 +570,11 @@ export function getSidePaneTabTitle(
     return tab.title?.trim() || formatMessage({ id: "browser.title" });
   }
 
+  if (tab.type === "plugin-ui") {
+    return tab.title.trim() || formatMessage({ id: "sidePane.pluginUi" });
+  }
+
+  if (tab.type === "file-manager")
+    return tab.source?.title || formatMessage({ id: "fileManager.title" });
   return tab.source.title || formatMessage({ id: "codeViewer.title" });
 }

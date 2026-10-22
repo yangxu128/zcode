@@ -16,10 +16,7 @@ import type {
   ProviderModelDraftValues,
   ProviderModelDraftCommitResult,
 } from "@/settings/model-provider-section/ProviderModelMetadata.js";
-import {
-  ProviderModelInputModalityOptions,
-  ProviderModelOutputModalityOptions,
-} from "@/settings/model-provider-section/ProviderModelModalityOptions.js";
+import { ProviderModelInputModalityOptions } from "@/settings/model-provider-section/ProviderModelModalityOptions.js";
 import { BooleanModelOption } from "@/settings/model-provider-section/ProviderModelMetadataFields.js";
 import {
   ModelSettingsGroup,
@@ -42,7 +39,7 @@ import {
 
 import { ModelEditorAdvanced } from "@/settings/model-provider-section/ModelEditorAdvanced.js";
 
-function selectFocusedInputText(event: Pick<FocusEvent<HTMLInputElement>, "currentTarget">) {
+export function selectFocusedInputText(event: Pick<FocusEvent<HTMLInputElement>, "currentTarget">) {
   event.currentTarget.select();
 }
 
@@ -318,17 +315,6 @@ export function ProviderModelMetadataDialog({
                     value={draft.inputFormatValue}
                     onChange={(inputFormatValue) => onDraftChange({ inputFormatValue })}
                     personalValue={personalConfig?.properties?.inputFormat}
-                    overrideFields={activeOverrides}
-                  />
-                </div>
-                <div>
-                  <div className="mb-1 block text-ui-base text-foreground-subtle">
-                    {intl.formatMessage({ id: "settings.modelProvider.outputModalities" })}
-                  </div>
-                  <ProviderModelOutputModalityOptions
-                    value={draft.outputFormatValue}
-                    onChange={(outputFormatValue) => onDraftChange({ outputFormatValue })}
-                    personalValue={personalConfig?.properties?.outputFormat}
                     overrideFields={activeOverrides}
                   />
                 </div>

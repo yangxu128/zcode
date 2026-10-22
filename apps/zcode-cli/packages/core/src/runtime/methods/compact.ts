@@ -12,7 +12,6 @@ import {
   hasEnoughMessagesToCompact,
   shouldAutoCompact,
 } from "../deps.js";
-import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import type {
   AutoCompactPolicyConfig,
   AutoCompactTokenOverride,
@@ -195,7 +194,7 @@ export async function autoCompactIfNeeded(
     contextWindow: context.model.properties.contextWindow,
     ...this.config.compact,
     maxOutputTokens: resolveNormalRequestMaxOutputTokens({
-      modelMaxOutputTokens: modelMaxOutputTokens(context.model),
+      modelMaxOutputTokens: context.model.optionSpecs.maxOutputTokens.max,
     }),
     modelContextBudgetStrategy: this.config.modelContextBudgetStrategy,
   };
@@ -245,6 +244,8 @@ export async function autoCompactIfNeeded(
     return "rapid_refill_blocked";
   }
 
+  // 跳过压缩时无需构建 listing 工具合同；读取失败仍向上抛出，不计入压缩失败。
+  const agentListingTools = context.getAgentListingTools?.();
   this.logger?.info("Auto compact started", {
     ...traceContextToLogContext(turnTraceContext),
     event: "compact.auto.started",
@@ -272,7 +273,9 @@ export async function autoCompactIfNeeded(
         compactReason: context.compactReason,
         phase: context.phase,
         trigger: CompactTrigger.Auto,
+        agentListingTools,
         activeEntries,
+        getContinuationTools: context.getContinuationTools,
         ...(context.model ? { model: context.model } : {}),
       },
     );
@@ -427,7 +430,9 @@ export async function reactiveCompactAfterContextExceeded(
         initialPromptTooLongCause: originalError,
         phase: CompactPhase.Reactive,
         trigger: CompactTrigger.Reactive,
+        agentListingTools: context.agentListingTools,
         activeEntries,
+        getContinuationTools: context.getContinuationTools,
         model: context.model,
       },
     );

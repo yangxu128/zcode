@@ -4,9 +4,6 @@
  * 需要跨窗口同步的状态通过 BroadcastService 广播。
  * 广播频道前缀 "state:" 表示状态同步类消息。
  */
-/* oxlint-disable eslint(max-lines) -- 本 store 是主题/皮肤/壁纸/语言等外观与全局偏好的唯一所有者，
- * 状态按领域持续收敛在这里而非拆成多个 store；行数上限与聚合所有者冲突时保持收口
- * （与 Root.tsx / WorkspaceSidebarFooter.tsx 的豁免同一模式）。 */
 import { create } from "zustand";
 import type { IBroadcastService, BroadcastMessage } from "@zcode/services";
 import type { OAuthProviderId, UserInfo } from "@zcode/shared";
@@ -41,21 +38,6 @@ import {
 } from "@/lib/taskNotificationPreferences.js";
 import type { Theme } from "../useTheme.js";
 import { applyTheme, normalizeThemePreference, resolveTheme } from "../useTheme.js";
-import type { Skin } from "@/lib/skinPreference.js";
-import { applySkin, loadSkin, normalizeSkin, SKIN_STORAGE_KEY } from "@/lib/skinPreference.js";
-import {
-  applyWallpaper,
-  applyWallpaperStyle,
-  clearWallpaperStorage,
-  loadWallpaper,
-  loadWallpaperDim,
-  loadWallpaperStrength,
-  normalizeWallpaperDim,
-  normalizeWallpaperStrength,
-  saveWallpaper,
-  WALLPAPER_DIM_STORAGE_KEY,
-  WALLPAPER_STRENGTH_STORAGE_KEY,
-} from "@/lib/wallpaper.js";
 
 import {
   INTERFACE_MODE_STORAGE_KEY,
@@ -87,6 +69,26 @@ export interface LoginEntryAttempt {
 
 const CODE_PREVIEW_SETTINGS_KEY = "zcode-code-preview-settings";
 const PERFORMANCE_MODE_STORAGE_KEY = "zcode-performance-mode";
+export const FILE_MANAGER_NAVIGATION_PREFERENCES_STORAGE_KEY =
+  "zcode-file-manager-navigation-preferences";
+
+function loadFileManagerNavigationPreferences(): Record<string, boolean> {
+  try {
+    const raw = readSafeLocalStorage(FILE_MANAGER_NAVIGATION_PREFERENCES_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, boolean] =>
+          entry[0].trim().length > 0 && typeof entry[1] === "boolean",
+      ),
+    );
+  } catch {
+    return {};
+  }
+}
 
 function loadCodePreviewSettings(): CodePreviewSettings {
   try {
@@ -126,24 +128,6 @@ export interface ZCodeState {
   theme: Theme;
   setTheme: (theme: Theme) => void;
 
-  /** 当前皮肤：只调整强调色，与明暗主题正交（见 docs/ui/theme-skin.md）。 */
-  skin: Skin;
-  setSkin: (skin: Skin) => void;
-
-  /**
-   * 自定义背景图片：内存渲染源与跨窗口同步令牌；持久化真值在 IndexedDB，
-   * store 不做第二份持久化（见 docs/ui/theme-skin.md）。
-   */
-  wallpaperDataUrl: string | null;
-  wallpaperVersion: number;
-  setWallpaper: (dataUrl: string | null) => Promise<void>;
-  syncWallpaper: (version: number) => Promise<void>;
-
-  /** 壁纸显示调节：可见度（0–80）与遮罩浓度（0–100），与壁纸图片相互独立。 */
-  wallpaperStrength: number;
-  wallpaperDim: number;
-  setWallpaperStyle: (strength: number, dim: number) => void;
-
   /** 当前语言 */
   locale: string;
   setLocale: (locale: string) => void;
@@ -151,6 +135,10 @@ export interface ZCodeState {
   /** 代码预览设置 */
   codePreviewSettings: CodePreviewSettings;
   setCodePreviewSettings: (patch: Partial<CodePreviewSettings>) => void;
+
+  /** 各 workspace 的文件导航显隐偏好；缺席时默认展开。 */
+  fileManagerNavigationOpenByWorkspace: Record<string, boolean>;
+  setFileManagerNavigationOpen: (workspaceKey: string, open: boolean) => void;
 
   /** UI 根 rem 字号（px） */
   uiFontSizePx: number;
@@ -249,24 +237,20 @@ export interface ZCodeState {
 
 const BROADCAST_FIELDS = new Set([
   "theme",
-  "skin",
   "locale",
   "uiFontSizePx",
   "interfaceMode",
-  "wallpaperVersion",
-  "wallpaperStrength",
-  "wallpaperDim",
+  "notificationEnabled",
 ]);
 
 type BroadcastField =
   | "theme"
-  | "skin"
   | "locale"
   | "uiFontSizePx"
   | "interfaceMode"
-  | "wallpaperVersion"
-  | "wallpaperStrength"
-  | "wallpaperDim";
+  // 任务通知开关跨窗口同步：角标是应用级表面，A 窗口关通知而 B 窗口仍上报未读时，
+  // 主进程 max 聚合会让任务栏/托盘继续亮，设置与提醒状态错位。
+  | "notificationEnabled";
 
 /** 广播频道名前缀 */
 const STATE_CHANNEL_PREFIX = "state:";
@@ -317,51 +301,6 @@ export function createZCodeStore(
       set({ theme: normalizedTheme });
     },
 
-    skin: loadSkin(),
-    setSkin: (skin: Skin) => {
-      const normalizedSkin = normalizeSkin(skin);
-      writeSafeLocalStorage(SKIN_STORAGE_KEY, normalizedSkin);
-      applySkin(normalizedSkin);
-      set({ skin: normalizedSkin });
-    },
-
-    wallpaperDataUrl: null,
-    wallpaperVersion: 0,
-    setWallpaper: async (dataUrl) => {
-      if (dataUrl === null) {
-        await clearWallpaperStorage();
-        applyWallpaper(null);
-        set({ wallpaperDataUrl: null, wallpaperVersion: Date.now() });
-        return;
-      }
-      const wallpaperVersion = await saveWallpaper(dataUrl);
-      if (wallpaperVersion === 0) {
-        // IDB 写入失败：不应用也不广播，保持当前壁纸不变（失败语义见 spec）。
-        logger.debug("[Wallpaper] IndexedDB 持久化失败，跳过应用");
-        return;
-      }
-      applyWallpaper(dataUrl);
-      set({ wallpaperDataUrl: dataUrl, wallpaperVersion });
-    },
-    syncWallpaper: async (version) => {
-      // 版本比较保证幂等：过期的广播（含本窗口水合/同步引发的回声）直接忽略。
-      if (version <= get().wallpaperVersion) return;
-      const dataUrl = await loadWallpaper();
-      applyWallpaper(dataUrl);
-      set({ wallpaperDataUrl: dataUrl, wallpaperVersion: version });
-    },
-
-    wallpaperStrength: loadWallpaperStrength(),
-    wallpaperDim: loadWallpaperDim(),
-    setWallpaperStyle: (strength, dim) => {
-      const wallpaperStrength = normalizeWallpaperStrength(strength);
-      const wallpaperDim = normalizeWallpaperDim(dim);
-      writeSafeLocalStorage(WALLPAPER_STRENGTH_STORAGE_KEY, String(wallpaperStrength));
-      writeSafeLocalStorage(WALLPAPER_DIM_STORAGE_KEY, String(wallpaperDim));
-      applyWallpaperStyle(wallpaperStrength, wallpaperDim);
-      set({ wallpaperStrength, wallpaperDim });
-    },
-
     locale: readSafeLocalStorage("zcode-locale") || "zh-CN",
     setLocale: (locale: string) => {
       writeSafeLocalStorage("zcode-locale", locale);
@@ -382,6 +321,23 @@ export function createZCodeStore(
         writeSafeLocalStorage(CODE_PREVIEW_SETTINGS_KEY, JSON.stringify(next));
         return { codePreviewSettings: next };
       }),
+
+    fileManagerNavigationOpenByWorkspace: loadFileManagerNavigationPreferences(),
+    setFileManagerNavigationOpen: (workspaceKey, open) => {
+      const normalizedWorkspaceKey = workspaceKey.trim();
+      if (!normalizedWorkspaceKey) return;
+      set((state) => {
+        const next = {
+          ...state.fileManagerNavigationOpenByWorkspace,
+          [normalizedWorkspaceKey]: open,
+        };
+        writeSafeLocalStorage(
+          FILE_MANAGER_NAVIGATION_PREFERENCES_STORAGE_KEY,
+          JSON.stringify(next),
+        );
+        return { fileManagerNavigationOpenByWorkspace: next };
+      });
+    },
 
     uiFontSizePx: loadUiFontSizePx(),
     setUiFontSizePx: (fontSizePx: number) => {
@@ -571,17 +527,6 @@ export function createZCodeStore(
       const state = useStore.getState();
       if (field === "theme" && typeof msg.payload === "string") {
         state.setTheme(msg.payload as Theme);
-      } else if (field === "skin" && typeof msg.payload === "string") {
-        // 广播侧只做类型收窄，合法性由 setSkin 内的 normalizeSkin 兜底。
-        state.setSkin(msg.payload as Skin);
-      } else if (field === "wallpaperVersion" && typeof msg.payload === "number") {
-        // 异步补拉 IDB；set 完成晚于守卫释放，引发的重复广播会被 syncWallpaper 的版本比较吞掉。
-        void state.syncWallpaper(msg.payload);
-      } else if (field === "wallpaperStrength" && typeof msg.payload === "number") {
-        // 广播只带一个字段，另一参数沿用本窗口当前值；未变的字段不会再次广播。
-        state.setWallpaperStyle(msg.payload, state.wallpaperDim);
-      } else if (field === "wallpaperDim" && typeof msg.payload === "number") {
-        state.setWallpaperStyle(state.wallpaperStrength, msg.payload);
       } else if (field === "locale" && typeof msg.payload === "string") {
         state.setLocale(msg.payload);
       } else if (
@@ -591,6 +536,8 @@ export function createZCodeStore(
         state.setInterfaceMode(normalizeInterfaceMode(msg.payload));
       } else if (field === "uiFontSizePx" && typeof msg.payload === "number") {
         state.setUiFontSizePx(msg.payload);
+      } else if (field === "notificationEnabled" && typeof msg.payload === "boolean") {
+        state.setNotificationEnabled(msg.payload);
       }
     } finally {
       applyingBroadcast = false;
@@ -599,16 +546,6 @@ export function createZCodeStore(
 
   syncSystemThemeListener(useStore.getState().theme);
   applyTheme(useStore.getState().theme);
-  applySkin(useStore.getState().skin);
-  applyWallpaperStyle(useStore.getState().wallpaperStrength, useStore.getState().wallpaperDim);
-  // 壁纸真值在 IndexedDB，水合是异步的；仅在尚无版本时写入状态，避免与广播竞态互踩。
-  void loadWallpaper().then((dataUrl) => {
-    if (!dataUrl) return;
-    applyWallpaper(dataUrl);
-    if (useStore.getState().wallpaperVersion === 0) {
-      useStore.setState({ wallpaperDataUrl: dataUrl, wallpaperVersion: Date.now() });
-    }
-  });
   applyUiFontSizePx(useStore.getState().uiFontSizePx);
   document.documentElement.classList.toggle(
     "dark",
