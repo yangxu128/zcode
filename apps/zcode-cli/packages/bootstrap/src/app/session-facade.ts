@@ -7,6 +7,7 @@ import {
   traceContextToLogContext,
   type CollaborationMode,
   type ExecutionPort,
+  type GenerationPort,
   type GoalStatus,
   type Logger,
   type LoggerFactory,
@@ -28,6 +29,7 @@ import { loadSessionTranscriptFromStore } from "../session-transcript.js";
 import { createSubagentObservation } from "./subagent-observation.js";
 import { getLocaleConfigPath } from "./locale-selection.js";
 import { isClosableSessionStore } from "./session-store.js";
+import { pickGenerationModality } from "./generation-port.js";
 import type { ProviderRegistryModelSource } from "./provider-registry-model-runtime.js";
 import {
   completeAuxiliaryRegistryModelSelection,
@@ -51,6 +53,10 @@ type SessionFacade = Pick<
   | "connectMcpServer"
   | "disconnectMcpServer"
   | "generateWorkspaceText"
+  | "generateWorkspaceImage"
+  | "saveWorkspaceGeneratedMedia"
+  | "startWorkspaceVideo"
+  | "getWorkspaceVideoTask"
   | "testModelConnectivity"
   | "forkFromCheckpoint"
   | "getMode"
@@ -103,6 +109,8 @@ interface CreateSessionFacadeDeps {
   configuredMcpServers: Record<string, McpServerConfig>;
   configuredDefaultModelSelection?: ModelSelection;
   executionPort: ExecutionPort;
+  /** 生图/生视频连接探测用的宿主端口；缺席时生成模型的连接测试明确报能力缺席。 */
+  generationPort?: GenerationPort;
   localSettingStore?: LocalSettingStorePort;
   logger: Logger;
   loggerFactory: LoggerFactory;
@@ -407,6 +415,25 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
       );
     },
     testModelConnectivity: async (input, options) => {
+      // 生图/生视频模型没有对话端点：chat/completions 探测会被网关拒回
+      // "Model X is an image model. Use /v1/images/generations."，用户看到的是失败而不是
+      // 可达证据。这里按 Registry 里的输出模态意图改走生成端点探测
+      // （docs/agents/image-video-generation.md「连接测试按模态选端点」）。
+      const probedModel = deps.providerRegistry.getModel(
+        input.selection.providerId,
+        input.selection.modelId,
+      );
+      const generationModality = probedModel && pickGenerationModality(probedModel.config);
+      if (generationModality) {
+        if (!deps.generationPort) {
+          throw new Error("当前 Environment 未装配生成端口，无法测试生成模型连接");
+        }
+        await deps.generationPort.testConnectivity(
+          { providerId: input.selection.providerId, modelId: input.selection.modelId },
+          generationModality,
+        );
+        return;
+      }
       // 连接测试用的 Model 也要先绑定最低档位，否则严格 Factory 会先因缺档位失败。
       const selection = completeAuxiliaryRegistryModelSelection(
         deps.providerRegistry,
@@ -420,6 +447,15 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
         },
       );
     },
+    generateWorkspaceImage: async (input, options) =>
+      // 生成执行与凭据都在 core 的宿主端口面上，这里只转发意图
+      // （docs/ui/canvas-pane.md T4、docs/agents/image-video-generation.md）。
+      await deps.runtime.generateWorkspaceImage(input, { abortSignal: options?.abortSignal }),
+    saveWorkspaceGeneratedMedia: async (input) =>
+      await deps.runtime.saveWorkspaceGeneratedMedia(input),
+    startWorkspaceVideo: async (input, options) =>
+      await deps.runtime.startWorkspaceVideo(input, { abortSignal: options?.abortSignal }),
+    getWorkspaceVideoTask: async (input) => await deps.runtime.getWorkspaceVideoTask(input),
     setMode: async (mode: CollaborationMode) => {
       const previousMode = deps.runtime.getMode();
       await deps.runtime.setExecutionState({ mode }, deps.traceContext);

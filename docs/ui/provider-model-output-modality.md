@@ -35,10 +35,18 @@ maxOutputTokens——生图/生视频模型（无推理档位、上下文语义�
   身份（不档位化）。
 - `model-selection-config.ts`：初始推荐/档位补全跳过无档位模型；
   normalize 在缺档位时保留身份并等待档位。
+- **Registry 发布容忍**：`createRegistryModelConfig` 在模型声明生图/生视频输出且
+  `optionSpecs` 缺省或为 null 时，先物化空 optionSpecs 再做完整性校验。缺陷成因：
+  `completeModelConfigDataSchema` 要求 `optionSpecs` 键存在，而 resolver 对缺省值是
+  「原样省略」，于是只有生成模型的供应商会因全部 Model 不 executable 被整体摘出执行
+  Registry（`resolver.ts` 中 `validModels.length === 0 → continue`），连接测试最终报
+  「Provider Registry 中不存在 Provider: <id>」而不是 Model 级错误。文本输出模型仍必须
+  物化 optionSpecs——缺档位要在发布前暴露，不能放进聊天链路。
 - **聊天选择器排除**：composer 可选模型列表过滤掉
   `outputFormat.supportsText === false` 的模型——它们不是聊天模型，
   进入聊天选择只会产生必然失败的请求。（执行入口既有 Selection 完整性
-  校验继续兜底。）
+  校验继续兜底。）过滤后没有可选模型的供应商分组整体不渲染（`buildRegistryModelSelectGroups`）：
+  只配了生图/生视频模型的供应商若仍出现在菜单里，点开是空子菜单，看起来像「模型列表加载不出来」。
 
 ## 状态所有者
 
@@ -55,9 +63,13 @@ maxOutputTokens——生图/生视频模型（无推理档位、上下文语义�
   strict schema 下被剥离（旧行为），不影响旧客户端运行。
 - 非文本输出模型被强行用于聊天（绕过选择器）：执行入口的 Selection
   校验与供应商 API 报错兜底，不产生部分写入。
+- 生成模型没有 optionSpecs：Registry 物化空 specs 后照常发布（见上），Model 侧
+  拒绝任何生成选项；连接测试改走生成端点探测（docs/agents/image-video-generation.md），
+  不再请求 chat/completions。
 
 ## 非目标
 
 - 运行时实际的生图/生视频调用（image/video generation API 适配、画布或
-  文件场景的生成工具）——本轮只打通「配置存在且正确」，调用层另立。
+  文件场景的生成工具）——本轮只打通「配置存在且正确」；调用层与按模态选端点
+  的连接测试见 docs/agents/image-video-generation.md。
 - 内置模型规则（builtin rules）中预置生图模型条目。

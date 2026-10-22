@@ -1,6 +1,8 @@
 import { createUuid } from "@zcode/shared";
-import { readSafeLocalStorage } from "@/lib/browserEnvironment.js";
-import { logger } from "@/logger.js";
+import {
+  sanitizeMediaGenerationFields,
+  type CanvasMediaNodeFields,
+} from "@/lib/canvasGeneration.js";
 
 /**
  * 无限画布数据层（docs/ui/canvas-pane.md）：文档模型、几何工具与持久化。
@@ -37,7 +39,7 @@ export function serializeCanvasToMarkdown(
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const edges = doc.edges.filter((e) => nodeById.has(e.from) && nodeById.has(e.to));
   const kindLabel = (kind: CanvasNode["kind"]) =>
-    kind === "text" ? "文本" : kind === "note" ? "便签" : "图片";
+    kind === "text" ? "文本" : kind === "note" ? "便签" : kind === "video" ? "视频" : "图片";
   const lines: string[] = [
     "# 无限画布",
     "",
@@ -54,7 +56,14 @@ export function serializeCanvasToMarkdown(
         if (node.body.trim()) lines.push(node.body.trim(), "");
       } else {
         if (node.caption.trim()) lines.push(`说明：${node.caption.trim()}`, "");
-        lines.push(node.url ? "（含图片内容，见附件原图）" : "（无图片）", "");
+        // 生成结果给 agent 的是引用而不是像素：告诉它文件在哪，它才能续用（图生图/首帧）。
+        const mediaLabel = node.kind === "video" ? "视频" : "图片";
+        if (node.savedPath) lines.push(`${mediaLabel}文件：${node.savedPath}`, "");
+        else if (node.url) lines.push(`${mediaLabel}地址：${node.url}`, "");
+        else lines.push(`（无${mediaLabel}）`, "");
+        if (node.generation?.prompt) {
+          lines.push(`生成提示词：${node.generation.prompt}`, "");
+        }
       }
     }
   }
@@ -81,7 +90,7 @@ export function createCanvasChatFile(doc: CanvasDocument, selectedIds?: readonly
   return new File([content], `canvas-${scope}-${stamp}.md`, { type: "text/markdown" });
 }
 
-export type CanvasNodeKind = "text" | "note" | "image";
+export type CanvasNodeKind = "text" | "note" | "image" | "video";
 export type CanvasEdgeKind = "flow" | "depends";
 export type CanvasNoteColor = "amber" | "sky" | "green" | "violet" | "rose";
 
@@ -108,13 +117,27 @@ export interface CanvasNoteNode extends CanvasNodeBase {
   color: CanvasNoteColor;
 }
 
-export interface CanvasImageNode extends CanvasNodeBase {
+export interface CanvasImageNode extends CanvasNodeBase, CanvasMediaNodeFields {
   kind: "image";
+  /** 远程 URL 或上传降采样得到的 data URL；空串表示暂无图像。 */
   url: string;
   caption: string;
 }
 
-export type CanvasNode = CanvasTextNode | CanvasNoteNode | CanvasImageNode;
+/** 视频节点：结果只会是远程 URL（生成端不落盘大文件），任务态见 canvasGeneration.ts。 */
+export interface CanvasVideoNode extends CanvasNodeBase, CanvasMediaNodeFields {
+  kind: "video";
+  url: string;
+  caption: string;
+}
+
+export type {
+  CanvasGeneration,
+  CanvasGenerationStatus,
+  CanvasGenerationTaskRef,
+} from "./canvasGeneration.js";
+
+export type CanvasNode = CanvasTextNode | CanvasNoteNode | CanvasImageNode | CanvasVideoNode;
 
 export interface CanvasEdge {
   id: string;
@@ -144,9 +167,8 @@ export const CANVAS_NODE_DEFAULT_SIZE: Record<CanvasNodeKind, { w: number; h: nu
   text: { w: 260, h: 180 },
   note: { w: 200, h: 160 },
   image: { w: 232, h: 200 },
+  video: { w: 320, h: 200 },
 };
-
-const PERSIST_DEBOUNCE_MS = 600;
 
 function hashString(value: string): string {
   // djb2：workspaceKey 含路径分隔符与盘符，不能直接作 localStorage 键名。
@@ -215,7 +237,11 @@ export function createCanvasNode(
       return { ...base, kind, title: "", body: "", color: "amber" };
     case "image":
       return { ...base, kind, title: "", url: "", caption: "" };
+    case "video":
+      return { ...base, kind, title: "", url: "", caption: "" };
   }
+  // switch 已穷举 kind；保留不可达分支的显式返回以满足返回类型。
+  return { ...base, kind: "text", title: "", content: "" };
 }
 
 /**
@@ -357,7 +383,10 @@ function isValidCanvasNode(value: unknown): value is CanvasNode {
   const node = value as Partial<CanvasNode>;
   return (
     typeof node.id === "string" &&
-    (node.kind === "text" || node.kind === "note" || node.kind === "image") &&
+    (node.kind === "text" ||
+      node.kind === "note" ||
+      node.kind === "image" ||
+      node.kind === "video") &&
     typeof node.x === "number" &&
     typeof node.y === "number" &&
     typeof node.w === "number" &&
@@ -365,12 +394,27 @@ function isValidCanvasNode(value: unknown): value is CanvasNode {
   );
 }
 
+/**
+ * 图片节点的生成引用清洗：agent 手写的画布 JSON 可能带错误类型，
+ * 坏字段整块剥掉而不是让面板崩（与 kind 白名单同一纪律）。
+ */
+function sanitizeMediaNode<T extends CanvasImageNode | CanvasVideoNode>(node: T): T {
+  if (node.savedPath === undefined && node.generation === undefined) return node;
+  // 先剥原值再放回校验通过的部分：直接沿用原 node 会把 `savedPath: 42` 这类脏数据留在文档里。
+  const { savedPath: _rawSavedPath, generation: _rawGeneration, ...rest } = node;
+  return { ...rest, ...sanitizeMediaGenerationFields(node) } as T;
+}
+
 /** 解析画布文档 JSON；形状不符返回 null（agent 写入的脏数据不崩面板）。 */
 export function parseCanvasDocument(raw: string): CanvasDocument | null {
   try {
     const parsed = JSON.parse(raw) as Partial<CanvasDocument>;
     if (!parsed || !Array.isArray(parsed.nodes)) return null;
-    const nodes = parsed.nodes.filter(isValidCanvasNode);
+    const nodes = parsed.nodes
+      .filter(isValidCanvasNode)
+      .map((node) =>
+        node.kind === "image" || node.kind === "video" ? sanitizeMediaNode(node) : node,
+      );
     const edges = Array.isArray(parsed.edges)
       ? parsed.edges.filter(
           (e): e is CanvasEdge =>
@@ -390,87 +434,4 @@ export function parseCanvasDocument(raw: string): CanvasDocument | null {
   } catch {
     return null;
   }
-}
-
-export function loadCanvasDocument(storageKey: string, boardId: string): CanvasDocument {
-  try {
-    const raw = readSafeLocalStorage(storageKey);
-    if (raw) {
-      const parsed = parseCanvasDocument(raw);
-      if (parsed) return { ...parsed, boardId };
-    }
-  } catch (error) {
-    logger.debug("[Canvas] 读取画布文档失败，使用空画布", { storageKey, error });
-  }
-  const now = Date.now();
-  return { boardId, nodes: [], edges: [], createdAt: now, updatedAt: now };
-}
-
-const persistTimers = new Map<string, number>();
-
-function stripImagePayloads(doc: CanvasDocument): CanvasDocument {
-  return {
-    ...doc,
-    nodes: doc.nodes.map((n) => (n.kind === "image" ? { ...n, url: "" } : n)),
-  };
-}
-
-function writeCanvasDocument(storageKey: string, doc: CanvasDocument) {
-  try {
-    window.localStorage.setItem(storageKey, JSON.stringify(doc));
-  } catch (error) {
-    // 配额溢出：剥离图片 data URL（体积大头）再试一次；仍失败则跳过本次持久化。
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(stripImagePayloads(doc)));
-      logger.debug("[Canvas] 持久化时剥离了图片载荷", { storageKey });
-    } catch (retryError) {
-      logger.debug("[Canvas] 画布持久化失败，已跳过", { storageKey, error, retryError });
-    }
-  }
-}
-
-export function scheduleCanvasPersist(storageKey: string, doc: CanvasDocument) {
-  const existing = persistTimers.get(storageKey);
-  if (existing) window.clearTimeout(existing);
-  const timer = window.setTimeout(() => {
-    persistTimers.delete(storageKey);
-    writeCanvasDocument(storageKey, doc);
-  }, PERSIST_DEBOUNCE_MS);
-  persistTimers.set(storageKey, timer);
-}
-
-/**
- * 本地图片降采样为 data URL（最长边 1280、JPEG 0.85），
- * 使上传图片可以安全进入 localStorage 持久化（objectURL 刷新即失效）。
- */
-export function downscaleImageToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const bitmapUrl = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(bitmapUrl);
-      try {
-        const scale = Math.min(1, 1280 / Math.max(image.naturalWidth, image.naturalHeight));
-        const width = Math.max(1, Math.round(image.naturalWidth * scale));
-        const height = Math.max(1, Math.round(image.naturalHeight * scale));
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d");
-        if (!context) {
-          reject(new Error("canvas 2d context unavailable"));
-          return;
-        }
-        context.drawImage(image, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      } catch (error) {
-        reject(error);
-      }
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(bitmapUrl);
-      reject(new Error(`图片解码失败: ${file.name}`));
-    };
-    image.src = bitmapUrl;
-  });
 }

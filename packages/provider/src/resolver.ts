@@ -11,6 +11,7 @@ import {
   type ApiKeyAccessConfig,
   ModelConfig,
   ModelConfigRules,
+  ModelOptionSpecsConfig,
   type ZhipuAccountAccessConfig,
   type ModelId,
   type ProviderConfig,
@@ -133,10 +134,33 @@ export function createRegistryModelConfig(
   config: ModelConfig,
   path: readonly string[] = ["model"],
 ): RegistryConfigResult<RegistryModelConfig> {
-  const issues = config.validateComplete(path);
+  const candidate = withGenerationModelOptionSpecs(config);
+  const issues = candidate.validateComplete(path);
   return issues.length > 0
     ? { ok: false, issues: Object.freeze([...issues]) }
-    : { ok: true, config: config as RegistryModelConfig };
+    : { ok: true, config: candidate as RegistryModelConfig };
+}
+
+/** 生图/生视频输出意图是权威的（docs/ui/provider-model-output-modality.md）。 */
+function declaresGenerationOutput(config: ModelConfig): boolean {
+  const outputFormat = config.properties?.outputFormat;
+  return outputFormat?.supportsImage === true || outputFormat?.supportsVideo === true;
+}
+
+/**
+ * 声明生图/生视频输出的模型可以整体不填 optionSpecs：它们没有推理档位与文本输出上限。
+ * 完整 Schema 仍要求 optionSpecs 键存在，而 `toJSON()` 会省略 undefined，于是这类模型被
+ * 判为不 executable；只有生成模型的 Provider 因此整体缺席执行 Registry，连接测试报
+ * 「Provider Registry 中不存在 Provider: <id>」而不是 Model 级错误。这里补一个空 specs
+ * 实例，保持 RegistryModelConfig 的 optionSpecs 恒定可读，不放宽文本输出模型的档位要求。
+ */
+function withGenerationModelOptionSpecs(config: ModelConfig): ModelConfig {
+  if (config.optionSpecs || !declaresGenerationOutput(config)) return config;
+  return new ModelConfig({
+    enabled: config.enabled,
+    properties: config.properties,
+    optionSpecs: new ModelOptionSpecsConfig({}),
+  });
 }
 
 export interface ProviderConfigResolverInput {

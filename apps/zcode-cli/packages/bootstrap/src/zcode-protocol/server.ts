@@ -49,7 +49,11 @@ import {
 import { listChildProcesses } from "./process-child-processes.js";
 import { ProtocolRuntimeResources } from "./runtime-resources.js";
 import {
+  generateWorkspaceImage,
+  getWorkspaceVideoTask,
   readWorkspacePresentation,
+  saveWorkspaceGeneratedMedia,
+  startWorkspaceVideo,
   testProviderModelConnectivity,
 } from "./workspace-model-runtime.js";
 import {
@@ -641,6 +645,14 @@ export class ZCodeProtocolAgentServer {
         return this.cancelWorkspaceGenerateText(request.params);
       case zcodeProtocolMethods.providerTestModelConnectivity:
         return await testProviderModelConnectivity(this.context, request.params);
+      case zcodeProtocolMethods.workspaceGenerateImage:
+        return await generateWorkspaceImage(this.context, request.params);
+      case zcodeProtocolMethods.workspaceSaveGeneratedMedia:
+        return await saveWorkspaceGeneratedMedia(this.context, request.params);
+      case zcodeProtocolMethods.workspaceStartVideo:
+        return await startWorkspaceVideo(this.context, request.params);
+      case zcodeProtocolMethods.workspaceVideoTask:
+        return await getWorkspaceVideoTask(this.context, request.params);
       case zcodeProtocolMethods.mcpList:
         return await listMcpServers(this.context, request.params);
       case zcodeProtocolMethods.pluginsList:

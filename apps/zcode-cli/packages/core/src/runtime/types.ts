@@ -1,3 +1,4 @@
+import type { GenerationPort } from "@zcode/contracts";
 import type { RuntimeInputPresentation } from "@zcode/contracts";
 /* eslint-disable max-lines -- Runtime 类型集中承载 core/runtime 对外结构，拆分需要单独迁移。 */
 import { PermissionService, ToolScheduler } from "./deps.js";
@@ -363,6 +364,7 @@ export interface AgentRuntimeDeps {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  generationPort?: GenerationPort;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   artifactStore?: ToolArtifactStorePort;
   automationPort?: AutomationPort;

@@ -534,6 +534,53 @@ export interface ZCodeApp {
     input: { selection: ModelSelection },
     options?: { abortSignal?: AbortSignal; traceContext?: TraceContext },
   ): Promise<void>;
+  /**
+   * 画布节点内生成（docs/ui/canvas-pane.md T4）：与 ImageGenerate 工具共用同一份
+   * 候选解析与宿主端口，UI 只交意图与参数，不接触凭据。
+   */
+  generateWorkspaceImage(
+    input: {
+      prompt: string;
+      size?: string;
+      ratio?: string;
+      image?: readonly string[];
+      model?: string;
+    },
+    options?: { abortSignal?: AbortSignal },
+  ): Promise<{ model: string; images: { url?: string; savedPath?: string }[] }>;
+  /** 把生成端外链落到工作区，返回相对路径（画布 T6）。 */
+  saveWorkspaceGeneratedMedia(input: { url: string }): Promise<{
+    savedPath: string;
+    reused: boolean;
+  }>;
+  /**
+   * 视频节点：只创建任务并返回任务身份，轮询由 UI 侧按节点状态继续。
+   * queued 表示服务商暂时拒收（限流/繁忙/连不上），UI 按 retryAfterMs 自动重投。
+   */
+  startWorkspaceVideo(
+    input: {
+      prompt: string;
+      seconds?: string;
+      aspectRatio?: string;
+      firstFrame?: string;
+      model?: string;
+    },
+    options?: { abortSignal?: AbortSignal },
+  ): Promise<
+    | {
+        status: "created";
+        model: string;
+        providerId: string;
+        modelId: string;
+        videoId: string;
+      }
+    | { status: "queued"; reason: string; retryAfterMs: number }
+  >;
+  getWorkspaceVideoTask(input: {
+    providerId: string;
+    modelId: string;
+    videoId: string;
+  }): Promise<{ status: "running" } | { status: "completed"; url: string } | { status: "failed"; detail?: string }>;
   expertWorkflowStatus(options?: {
     abortSignal?: AbortSignal;
     definitionId?: string;

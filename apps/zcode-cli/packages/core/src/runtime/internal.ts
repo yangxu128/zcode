@@ -1,3 +1,4 @@
+import type { GenerationPort } from "@zcode/contracts";
 import { PermissionService, ToolScheduler } from "./deps.js";
 import type {
   Logger,
@@ -103,6 +104,7 @@ export interface AgentRuntimeInternal
   subagentPort?: SubagentPort;
   dynamicWorkflowRunPort?: DynamicWorkflowRunPort;
   modelCatalogPort?: ModelCatalogPort;
+  generationPort?: GenerationPort;
   runtimeTaskRegistry: RuntimeTaskRegistry;
   branchGeneration: number;
   artifactStore?: ToolArtifactStorePort;

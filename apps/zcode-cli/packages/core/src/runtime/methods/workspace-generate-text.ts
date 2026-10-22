@@ -59,6 +59,8 @@ export async function testModelConnectivity(
   // 连接探测不需要生成正文；复用辅助生成的 5,000 预算会等待多余推理和输出。
   // 独立限制为 1 Token，仍使用最低公开档位，不改变其他辅助调用的预算。
   // 生图/生视频等非文本输出模型没有 optionSpecs：不做选项降档，直接用基础 Model 探测。
+  // 这类模型的连接测试现在由宿主 GenerationPort 按模态探测生成端点，不走到这里
+  // （docs/agents/image-video-generation.md）；此处保留缺省，避免无档位 Model 被误降档。
   const reasoningValues = modelReasoningValues(baseModel);
   const model =
     reasoningValues.length > 0

@@ -15,6 +15,7 @@ const KIND_MINIMAP_COLOR: Record<CanvasNodeKind, string> = {
   text: "#38bdf8",
   note: "#fbbf24",
   image: "#a78bfa",
+  video: "#4ade80",
 };
 
 export const CanvasMinimap = memo(function CanvasMinimap({

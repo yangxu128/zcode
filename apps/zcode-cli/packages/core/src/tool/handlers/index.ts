@@ -28,6 +28,8 @@ import { globToolEntry } from "./glob.js";
 import { grepToolEntry } from "./grep.js";
 import { webFetchToolEntry } from "./webfetch.js";
 import { webSearchToolEntry } from "./websearch.js";
+import { imageGenerateToolEntry } from "./image-generate.js";
+import { videoGenerateToolEntry } from "./video-generate.js";
 import {
   agentToolEntry,
   createAgentToolEntry,
@@ -83,6 +85,8 @@ export const builtInTools: ToolEntry[] = [
   grepToolEntry,
   webFetchToolEntry,
   webSearchToolEntry,
+  imageGenerateToolEntry,
+  videoGenerateToolEntry,
   todoReadToolEntry,
   todoWriteToolEntry,
   cronCreateToolEntry,
@@ -174,6 +178,8 @@ interface RegisterBuiltInToolsOptions {
   includeAutomation?: boolean;
   /** Off-Peak 会话内创建工具面；由 host 的 offPeakToolEnabled flag（灰度/远程门）驱动。 */
   includeOffPeak?: boolean;
+  /** 生成端口在场即注册 ImageGenerate/VideoGenerate；由 host 注入推导。 */
+  includeGeneration?: boolean;
   /**
    * 动态工作流灰度门。**只有显式 false
    * 才下架** DYNAMIC_WORKFLOW_TOOL_NAMES：缺席代表调用方不参与灰度（TUI、headless、
@@ -250,6 +256,14 @@ export function registerBuiltInTools(
     if (
       (entry.metadata.name === "OffPeakCreate" || entry.metadata.name === "OffPeakList") &&
       options.includeOffPeak !== true
+    ) {
+      continue;
+    }
+    // 生成工具的门：端口不在场（或 subagent 子会话）就不注册。少了这道判断，
+    // includeGeneration 只是空声明，模型会看见一个必然返回 generation_unavailable 的工具。
+    if (
+      (entry.metadata.name === "ImageGenerate" || entry.metadata.name === "VideoGenerate") &&
+      options.includeGeneration !== true
     ) {
       continue;
     }

@@ -6,13 +6,14 @@ import {
   buildCanvasFilePath,
   buildCanvasStorageKey,
   createCanvasChatFile,
-  downscaleImageToDataUrl,
   findFreeCanvasSpot,
   parseCanvasDocument,
   type CanvasDocument,
   type CanvasNode,
   type CanvasNodeKind,
 } from "@/lib/canvasDocument.js";
+import { downscaleImageToDataUrl } from "@/lib/canvasBrowserStorage.js";
+import { decodeBase64ToArrayBuffer } from "@/lib/officeFilePreview.js";
 import { useCanvasStore } from "@/store/canvasStore.js";
 import { useZCodeSessionStore } from "@/store/zcodeSessionStore.js";
 import { useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
@@ -28,6 +29,11 @@ import {
 } from "@/app-shell/canvas/CanvasOverlays.js";
 import { CanvasMinimap } from "@/app-shell/canvas/CanvasMinimap.js";
 import { CanvasSelectionToolbar } from "@/app-shell/canvas/CanvasSelectionToolbar.js";
+import { CanvasMediaDialog } from "@/app-shell/canvas/CanvasMediaDialog.js";
+import { CanvasMediaLightbox } from "@/app-shell/canvas/CanvasMediaLightbox.js";
+import { CanvasMediaQuickBar } from "@/app-shell/canvas/CanvasMediaQuickBar.js";
+import { useCanvasVideoTasks } from "@/app-shell/canvas/useCanvasVideoTasks.js";
+import { toast } from "@/components/ui/toast.js";
 
 /**
  * 无限画布侧边面板（docs/ui/canvas-pane.md）。
@@ -551,16 +557,51 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
     [paneRect, spawnAt, storageKey, store],
   );
 
+  // T6：把画布里已落地的图片作为真实附件注入对话；只有外链的节点仍按 Markdown 说明，
+  // 不伪造附件。
+  const collectCanvasImageFiles = useCallback(
+    async (targetNodes: CanvasNode[]): Promise<File[]> => {
+      if (!fileService) return [];
+      const files: File[] = [];
+      for (const node of targetNodes) {
+        if (node.kind !== "image" || !node.savedPath) continue;
+        try {
+          const preview = await fileService.readMediaPreview({
+            path: `${workspacePath.replace(/[\/]+$/, "")}/${node.savedPath.replace(/^\.?\//, "")}`,
+          });
+          const name = node.savedPath.split("/").pop() ?? `${node.id}.png`;
+          files.push(
+            new File([decodeBase64ToArrayBuffer(preview.dataBase64)], `canvas-${name}`, {
+              type: preview.mediaType,
+            }),
+          );
+        } catch (error) {
+          logger.debug("[Canvas] 图片附件读取失败，仅保留 Markdown 引用", {
+            error,
+            path: node.savedPath,
+          });
+        }
+      }
+      return files;
+    },
+    [fileService, workspacePath],
+  );
+
   const handleSendToChat = useCallback(() => {
     if (!doc) return;
     // 选中节点优先；无选中时发送整块画布。经 CustomEvent 交给聚焦中的 composer 附件。
     const file = createCanvasChatFile(doc, selection.length ? selection : undefined);
-    window.dispatchEvent(
-      new CustomEvent(ADD_CANVAS_TO_CHAT_EVENT, {
-        detail: { workspacePath, workspaceIdentity, files: [file] },
-      }),
-    );
-  }, [doc, selection, workspacePath, workspaceIdentity]);
+    const targets = selection.length
+      ? doc.nodes.filter((n) => selection.includes(n.id))
+      : doc.nodes;
+    void collectCanvasImageFiles(targets).then((mediaFiles) => {
+      window.dispatchEvent(
+        new CustomEvent(ADD_CANVAS_TO_CHAT_EVENT, {
+          detail: { workspacePath, workspaceIdentity, files: [file, ...mediaFiles] },
+        }),
+      );
+    });
+  }, [collectCanvasImageFiles, doc, selection, workspacePath, workspaceIdentity]);
 
   const handleAskAgent = useCallback(() => {
     if (!doc) return;
@@ -577,14 +618,17 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
       { canvasFile: canvasFilePath, focus: focusTitles || "—" },
     );
     // T1 通道：附件进对话；T3：提示词经 composerTextInsertRequest 预填输入框（可编辑后发送）。
-    window.dispatchEvent(
-      new CustomEvent(ADD_CANVAS_TO_CHAT_EVENT, {
-        detail: { workspacePath, workspaceIdentity, files: [file] },
-      }),
-    );
+    void collectCanvasImageFiles(focusNodes).then((mediaFiles) => {
+      window.dispatchEvent(
+        new CustomEvent(ADD_CANVAS_TO_CHAT_EVENT, {
+          detail: { workspacePath, workspaceIdentity, files: [file, ...mediaFiles] },
+        }),
+      );
+    });
     requestComposerTextInsert(workspacePath, prompt, workspaceIdentity);
   }, [
     canvasFilePath,
+    collectCanvasImageFiles,
     doc,
     intl,
     nodes,
@@ -594,11 +638,39 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
     workspacePath,
   ]);
 
+  // 连线即输入（docs/ui/canvas-pane.md T5）：指向媒体节点的上游图片节点提供
+  // 图生图参考或视频首帧。只认图片节点——视频 URL 不是合法的首帧素材。
+  const referencesByNode = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!doc) return map;
+    const byId = new Map(doc.nodes.map((item) => [item.id, item]));
+    for (const edge of doc.edges) {
+      const from = byId.get(edge.from);
+      if (!from || from.kind !== "image") continue;
+      const ref = from.url || from.savedPath;
+      if (!ref) continue;
+      const list = map.get(edge.to) ?? [];
+      if (!list.includes(ref)) list.push(ref);
+      map.set(edge.to, list);
+    }
+    return map;
+  }, [doc]);
+
+  useCanvasVideoTasks({
+    storageKey,
+    doc,
+    workspacePath,
+    ...(workspaceIdentity ? { workspaceIdentity } : {}),
+    // 排队重投要复用同一条连线的首帧，否则等限流窗口过去后会退化成纯文本生成。
+    referencesByNode,
+  });
+
   const backgroundMenuItems = (worldX: number, worldY: number): CanvasMenuItem[] => {
     const nodeKinds: { kind: CanvasNodeKind; key: string }[] = [
       { kind: "text", key: "canvas.node.text" },
       { kind: "note", key: "canvas.node.note" },
       { kind: "image", key: "canvas.node.image" },
+      { kind: "video", key: "canvas.node.video" },
     ];
     return [
       ...nodeKinds.map(({ kind, key }) => ({
@@ -635,7 +707,7 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
     setDropActive(false);
     const kind = event.dataTransfer.getData("text/canvas-node") as CanvasNodeKind | "";
     const world = toWorld(event.clientX, event.clientY);
-    if (kind === "text" || kind === "note" || kind === "image") {
+    if (kind === "text" || kind === "note" || kind === "image" || kind === "video") {
       spawnAt(kind, world.x, world.y);
       return;
     }
@@ -679,6 +751,25 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
   }, [selectedNodes, toScreen]);
 
   const linkingFrom = linking ? byId(linking.from) : null;
+
+  // 选中单个媒体节点时浮出工具栏与生成对话框（docs/ui/canvas-pane.md T7）。
+  // 坐标口径与多选工具条一致：世界坐标经 toScreen 变屏幕坐标，宽度按 zoom 换算。
+  const mediaOverlay = useMemo(() => {
+    if (selectedNodes.length !== 1) return null;
+    const node = selectedNodes[0];
+    if (!node || (node.kind !== "image" && node.kind !== "video")) return null;
+    const topLeft = toScreen(node.x, node.y);
+    const bottomLeft = toScreen(node.x, node.y + node.h);
+    const width = Math.min(420, Math.max(260, node.w * viewport.zoom));
+    return {
+      node,
+      bar: { x: topLeft.x + (node.w * viewport.zoom) / 2, y: topLeft.y - 44 },
+      dialog: { x: topLeft.x, y: bottomLeft.y + 8, width },
+    };
+  }, [selectedNodes, toScreen, viewport.zoom]);
+
+  const [lightboxId, setLightboxId] = useState<string | null>(null);
+  const lightboxNode = lightboxId ? byId(lightboxId) : undefined;
 
   return (
     <div
@@ -759,6 +850,8 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
           <CanvasNodeCard
             key={node.id}
             node={node}
+            workspacePath={workspacePath}
+            workspaceIdentity={workspaceIdentity}
             selected={selectionSet.has(node.id)}
             dragging={!!draggingIdSet?.has(node.id)}
             offset={draggingIdSet?.has(node.id) ? dragOffset : null}
@@ -818,6 +911,60 @@ export function CanvasPane({ workspacePath, workspaceIdentity, boardId }: Canvas
             store.getState().distributeNodes({ storageKey, ids: selection, axis })
           }
           onDelete={() => store.getState().removeNodes({ storageKey, ids: selection })}
+        />
+      ) : null}
+
+      {mediaOverlay ? (
+        <>
+          <CanvasMediaQuickBar
+            x={mediaOverlay.bar.x}
+            y={mediaOverlay.bar.y}
+            hasResult={!!mediaOverlay.node.url || !!mediaOverlay.node.savedPath}
+            hasLink={!!mediaOverlay.node.url}
+            onPreview={() => setLightboxId(mediaOverlay.node.id)}
+            onCopyLink={() => {
+              const url = mediaOverlay.node.url;
+              if (!url) return;
+              void navigator.clipboard
+                ?.writeText(url)
+                .then(() => toast(intl.formatMessage({ id: "canvas.media.linkCopied" })))
+                .catch(() => toast(intl.formatMessage({ id: "canvas.media.copyFailed" })));
+            }}
+            onSendToChat={handleSendToChat}
+            onAskAgent={handleAskAgent}
+            onDelete={() =>
+              store.getState().removeNodes({ storageKey, ids: [mediaOverlay.node.id] })
+            }
+          />
+          {workspacePath ? (
+            <CanvasMediaDialog
+              node={mediaOverlay.node}
+              x={mediaOverlay.dialog.x}
+              y={mediaOverlay.dialog.y}
+              width={mediaOverlay.dialog.width}
+              workspacePath={workspacePath}
+              {...(workspaceIdentity ? { workspaceIdentity } : {})}
+              references={referencesByNode.get(mediaOverlay.node.id) ?? []}
+              onUpdate={(patch) =>
+                store.getState().updateNode({ storageKey, id: mediaOverlay.node.id, patch })
+              }
+            />
+          ) : null}
+        </>
+      ) : null}
+
+      {(lightboxNode && lightboxNode.kind === "image") || lightboxNode?.kind === "video" ? (
+        <CanvasMediaLightbox
+          open={!!lightboxNode}
+          onOpenChange={(open) => {
+            if (!open) setLightboxId(null);
+          }}
+          kind={lightboxNode.kind}
+          {...(lightboxNode.url ? { url: lightboxNode.url } : {})}
+          {...(lightboxNode.savedPath ? { savedPath: lightboxNode.savedPath } : {})}
+          title={lightboxNode.caption || lightboxNode.title}
+          workspacePath={workspacePath ?? ""}
+          {...(workspaceIdentity ? { workspaceIdentity } : {})}
         />
       ) : null}
 

@@ -25,6 +25,7 @@ export * from "./interfaces/workflow-escalate.port.js";
 export * from "./interfaces/dynamic-workflow-run.port.js";
 export * from "./interfaces/dynamic-workflow-snippet.port.js";
 export * from "./interfaces/model-catalog.port.js";
+export * from "./interfaces/generation.port.js";
 export * from "./interfaces/automation.port.js";
 export * from "./interfaces/off-peak.port.js";
 export * from "./interfaces/mcp.port.js";
@@ -90,6 +91,7 @@ export * from "./network/public-egress-ip.js";
 
 // Tools
 export * from "./tools/index.js";
+export * from "./tools/generation.js";
 export * from "./tools/websearch.js";
 
 // 媒体预算上限由 App/Agent 共用策略定义；Contracts 统一转出，避免 Core 各处跨层取值。

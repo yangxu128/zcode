@@ -80,6 +80,7 @@ import {
 } from "./dynamic-workflow-run-service.js";
 import { getWorkflowConcurrencyGovernor } from "./workflow-concurrency-governor.js";
 import { createDynamicWorkflowSnippetService } from "./dynamic-workflow-snippet-service.js";
+import { createGenerationPort } from "./generation-port.js";
 import { createModelCatalogPort } from "./model-catalog-port.js";
 import { createDynamicWorkflowRunProgressSink } from "./dynamic-workflow-run-progress-sink.js";
 import { createScriptWorkflowAgentRuntime } from "./script-workflow-child-runtime.js";
@@ -723,6 +724,12 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
       registry: options.providerRegistry,
       currentSelection: () => getRuntime().getSessionModelSelection(),
     });
+    // 生成端口：ImageGenerate/VideoGenerate 工具的宿主执行面（docs/agents/image-video-generation.md）。
+    const generationPort = createGenerationPort({
+      registry: options.providerRegistry,
+      getWorkspacePath: () => workingDirectory,
+      logger: logger.child({ module: "generation" }),
+    });
     runtime = new AgentRuntime(sessionId, runtimeConfig, {
       agentTelemetry: modelTelemetry.agentExecution,
       // 主代理的模型请求过治理器的 observer：立即放行，但让治理器看见它的 429 / 成功。
@@ -772,6 +779,7 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
       dynamicWorkflowRunPort,
       dynamicWorkflowSnippetPort,
       modelCatalogPort,
+      generationPort,
       automationPort: options.automationPort,
       offPeakPort: options.offPeakPort,
       appVersion,
@@ -858,6 +866,7 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
           }
         : {}),
       executionPort,
+      generationPort,
       localSettingStore,
       logger,
       loggerFactory,

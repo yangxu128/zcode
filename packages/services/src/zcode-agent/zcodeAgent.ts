@@ -61,6 +61,10 @@ import type {
   ZCodeBrowserAmbientContext,
   ZCodeWorkspacePresentation,
   ZCodeWorkspaceGenerateTextResult,
+  ZCodeWorkspaceGenerateImageResult,
+  ZCodeWorkspaceSaveGeneratedMediaResult,
+  ZCodeWorkspaceStartVideoResult,
+  ZCodeWorkspaceVideoTaskResult,
   ZCodeWorkspaceGenerateTextParams,
   ZCodeWorkspaceHookTrustGrantResult,
   ZCodeAutomationBotDeliveryTarget,
@@ -318,6 +322,43 @@ export interface ZCodeAgentGenerateWorkspaceTextParams extends ZCodeAgentWorkspa
    * 还会被 onRequestTimeout 误判 stale 杀进程。
    */
   requestTimeoutMs?: number;
+}
+
+/** 画布节点内生图（docs/ui/canvas-pane.md T4）：只传意图与参数，凭据与模型选择在宿主。 */
+export interface ZCodeAgentGenerateWorkspaceImageParams extends ZCodeAgentWorkspaceTarget {
+  prompt: string;
+  size?: string;
+  ratio?: string;
+  image?: readonly string[];
+  /** 点名 `providerId/modelId`；缺席时宿主按候选顺序回退。 */
+  model?: string;
+  signal?: AbortSignal;
+  /** 生图是分钟级请求：调用方要透传自身 deadline，避免协议默认超时先触发。 */
+  requestTimeoutMs?: number;
+}
+
+/** 把生成端外链落到工作区（画布 T6）；幂等，重试不重复下载。 */
+export interface ZCodeAgentSaveGeneratedMediaParams extends ZCodeAgentWorkspaceTarget {
+  url: string;
+  signal?: AbortSignal;
+}
+
+/** 视频节点：只创建任务，返回的任务身份由节点持久化，刷新后继续查询。 */
+export interface ZCodeAgentStartWorkspaceVideoParams extends ZCodeAgentWorkspaceTarget {
+  prompt: string;
+  seconds?: string;
+  aspectRatio?: string;
+  firstFrame?: string;
+  model?: string;
+  signal?: AbortSignal;
+  requestTimeoutMs?: number;
+}
+
+export interface ZCodeAgentWorkspaceVideoTaskParams extends ZCodeAgentWorkspaceTarget {
+  providerId: string;
+  modelId: string;
+  videoId: string;
+  signal?: AbortSignal;
 }
 
 export interface ZCodeAgentTestModelConnectivityParams extends ZCodeAgentWorkspaceTarget {
@@ -690,6 +731,18 @@ export interface IZCodeAgentService {
   testModelConnectivity(
     params: ZCodeAgentTestModelConnectivityParams,
   ): Promise<ZCodeProviderTestModelConnectivityResult>;
+  generateWorkspaceImage(
+    params: ZCodeAgentGenerateWorkspaceImageParams,
+  ): Promise<ZCodeWorkspaceGenerateImageResult>;
+  saveWorkspaceGeneratedMedia(
+    params: ZCodeAgentSaveGeneratedMediaParams,
+  ): Promise<ZCodeWorkspaceSaveGeneratedMediaResult>;
+  startWorkspaceVideo(
+    params: ZCodeAgentStartWorkspaceVideoParams,
+  ): Promise<ZCodeWorkspaceStartVideoResult>;
+  getWorkspaceVideoTask(
+    params: ZCodeAgentWorkspaceVideoTaskParams,
+  ): Promise<ZCodeWorkspaceVideoTaskResult>;
   /**
    * @deprecated：send 主路径已收敛 v4 sendText 命令。仅剩两个消费点——
    * adapter 带附件输入回退（待附件命令面落地后移除）与 zcodeSessionService

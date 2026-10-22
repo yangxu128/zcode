@@ -7,6 +7,7 @@ import type {
   DynamicWorkflowRunPort,
   DynamicWorkflowSnippetPort,
   ModelCatalogPort,
+  GenerationPort,
   EmbeddedSearchBackend,
   ExecutionPort,
   BrowserControlPort,
@@ -114,6 +115,7 @@ export interface ToolExecutorOptions {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  generationPort?: GenerationPort;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState?: ReadFileStateMap;
   /** 技能门的探针（ToolInputResolutionContext.hasLoadedSkill）；runtime 按 provider 可见历史回答。 */
@@ -220,6 +222,8 @@ export interface ToolExecutorDeps {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  /** 生图/生视频端口；由 runtime 注入，call-runner 再放进 ToolExecutionContext。 */
+  generationPort?: GenerationPort;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState: ReadFileStateMap;
   hasLoadedSkill?: (skillName: string) => boolean;

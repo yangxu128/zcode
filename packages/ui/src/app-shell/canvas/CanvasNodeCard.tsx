@@ -1,16 +1,15 @@
 import { memo, useState } from "react";
-import { ImagePlus, MoreHorizontal, Plus, Type } from "lucide-react";
+import { ImagePlus, MoreHorizontal, Plus, Type, Video } from "lucide-react";
 import { cn } from "@/components/lib/utils.js";
-import {
-  downscaleImageToDataUrl,
-  type CanvasNode,
-  type CanvasNoteColor,
-} from "@/lib/canvasDocument.js";
+import { type CanvasNode, type CanvasNoteColor } from "@/lib/canvasDocument.js";
+import { CanvasMediaBody } from "./CanvasMediaBody.js";
+import { describeCanvasMediaStage, fitNodeToAspect } from "./canvasMediaStage.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 
 /**
  * 画布节点卡片：世界坐标内绝对定位，标题可编辑，正文按类型渲染。
  * 拖拽/连线/菜单由父级（CanvasPane）接管，输入控件内部不触发拖拽。
+ * 有结果的媒体节点不显示标题栏（T7）：媒体占满整张卡，标题与生成入口在选中浮层里。
  */
 
 const NOTE_COLORS: Record<CanvasNoteColor, string> = {
@@ -33,6 +32,9 @@ export interface CanvasNodeCardProps {
   onOpenMenu: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onAdd: (side: "left" | "right", event: React.MouseEvent<HTMLButtonElement>) => void;
   onUpdate: (patch: Partial<CanvasNode>) => void;
+  /** 提供后空媒体节点才出现上传退路（T4/T5 需要工作区级服务）。 */
+  workspacePath?: string;
+  workspaceIdentity?: string;
 }
 
 export const CanvasNodeCard = memo(function CanvasNodeCard({
@@ -45,18 +47,27 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
   onOpenMenu,
   onAdd,
   onUpdate,
+  workspacePath,
+  workspaceIdentity,
 }: CanvasNodeCardProps) {
   const { intl } = useZCodeIntl();
   const [editingTitle, setEditingTitle] = useState(false);
   const x = node.x + (dragging ? (offset?.x ?? 0) : 0);
   const y = node.y + (dragging ? (offset?.y ?? 0) : 0);
+  const mediaStage = describeCanvasMediaStage(node);
+  const filled =
+    mediaStage?.stage === "image" ||
+    mediaStage?.stage === "video" ||
+    mediaStage?.stage === "video-local";
 
   const titlePlaceholder =
     node.kind === "text"
       ? intl.formatMessage({ id: "canvas.node.text" })
       : node.kind === "note"
         ? intl.formatMessage({ id: "canvas.node.note" })
-        : intl.formatMessage({ id: "canvas.node.image" });
+        : node.kind === "video"
+          ? intl.formatMessage({ id: "canvas.node.video" })
+          : intl.formatMessage({ id: "canvas.node.image" });
 
   return (
     <div
@@ -66,6 +77,7 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
         selected && "zcode-canvas-node-selected",
         dragging && "zcode-canvas-node-dragging",
         node.kind === "note" && "zcode-canvas-node-note",
+        filled && "zcode-canvas-node-media",
       )}
       style={{
         left: x,
@@ -85,50 +97,54 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
         onPointerDown(event);
       }}
     >
-      <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/50 px-2">
-        {node.kind === "text" ? (
-          <Type className="size-3.5 shrink-0 text-foreground-subtle" />
-        ) : node.kind === "note" ? (
-          <span
-            className="size-3 shrink-0 rounded-full"
-            style={{ backgroundColor: NOTE_COLORS[node.color] }}
-          />
-        ) : (
-          <ImagePlus className="size-3.5 shrink-0 text-foreground-subtle" />
-        )}
-        {editingTitle ? (
-          <input
-            autoFocus
-            className="min-w-0 flex-1 bg-transparent text-ui-sm font-medium text-foreground outline-none"
-            value={node.title}
-            onChange={(event) => onUpdate({ title: event.target.value } as Partial<CanvasNode>)}
-            onBlur={() => setEditingTitle(false)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === "Escape") setEditingTitle(false);
-            }}
-          />
-        ) : (
+      {filled ? null : (
+        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/50 px-2">
+          {node.kind === "text" ? (
+            <Type className="size-3.5 shrink-0 text-foreground-subtle" />
+          ) : node.kind === "note" ? (
+            <span
+              className="size-3 shrink-0 rounded-full"
+              style={{ backgroundColor: NOTE_COLORS[node.color] }}
+            />
+          ) : node.kind === "video" ? (
+            <Video className="size-3.5 shrink-0 text-foreground-subtle" />
+          ) : (
+            <ImagePlus className="size-3.5 shrink-0 text-foreground-subtle" />
+          )}
+          {editingTitle ? (
+            <input
+              autoFocus
+              className="min-w-0 flex-1 bg-transparent text-ui-sm font-medium text-foreground outline-none"
+              value={node.title}
+              onChange={(event) => onUpdate({ title: event.target.value } as Partial<CanvasNode>)}
+              onBlur={() => setEditingTitle(false)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === "Escape") setEditingTitle(false);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              className="min-w-0 flex-1 truncate text-left text-ui-sm font-medium text-foreground"
+              onClick={() => setEditingTitle(true)}
+            >
+              {node.title || <span className="text-foreground-subtlest">{titlePlaceholder}</span>}
+            </button>
+          )}
           <button
             type="button"
-            className="min-w-0 flex-1 truncate text-left text-ui-sm font-medium text-foreground"
-            onClick={() => setEditingTitle(true)}
+            data-canvas-node-menu
+            aria-label={intl.formatMessage({ id: "canvas.menu" })}
+            className="hidden rounded p-0.5 text-foreground-subtle hover:bg-surface-hover group-hover:block"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={onOpenMenu}
           >
-            {node.title || <span className="text-foreground-subtlest">{titlePlaceholder}</span>}
+            <MoreHorizontal className="size-4" />
           </button>
-        )}
-        <button
-          type="button"
-          data-canvas-node-menu
-          aria-label={intl.formatMessage({ id: "canvas.menu" })}
-          className="hidden rounded p-0.5 text-foreground-subtle hover:bg-surface-hover group-hover:block"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={onOpenMenu}
-        >
-          <MoreHorizontal className="size-4" />
-        </button>
-      </div>
+        </div>
+      )}
 
-      <div className="min-h-0 flex-1 p-2">
+      <div className={cn("min-h-0 flex-1", filled ? "overflow-hidden rounded-xl" : "p-2")}>
         {node.kind === "text" ? (
           <textarea
             value={node.content}
@@ -144,43 +160,17 @@ export const CanvasNodeCard = memo(function CanvasNodeCard({
             className="zcode-canvas-editable h-full w-full resize-none bg-transparent text-ui-sm leading-5 text-foreground outline-none placeholder:text-foreground-subtlest"
           />
         ) : (
-          <div className="flex h-full flex-col gap-1.5">
-            {node.url ? (
-              <img
-                src={node.url}
-                alt={node.caption || node.title}
-                className="min-h-0 flex-1 rounded-lg object-contain"
-                draggable={false}
-              />
-            ) : (
-              <label className="flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-foreground-subtle hover:bg-surface-hover">
-                <ImagePlus className="size-5" />
-                <span className="text-ui-xs">
-                  {intl.formatMessage({ id: "canvas.image.pick" })}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    event.target.value = "";
-                    if (!file) return;
-                    // 降采样为 data URL 以便持久化；解码失败保持空图占位，不中断编辑。
-                    downscaleImageToDataUrl(file)
-                      .then((url) => onUpdate({ url } as Partial<CanvasNode>))
-                      .catch(() => undefined);
-                  }}
-                />
-              </label>
-            )}
-            <input
-              value={node.caption}
-              placeholder={intl.formatMessage({ id: "canvas.placeholder.caption" })}
-              onChange={(event) => onUpdate({ caption: event.target.value } as Partial<CanvasNode>)}
-              className="w-full bg-transparent text-ui-xs text-foreground-subtle outline-none placeholder:text-foreground-subtlest"
-            />
-          </div>
+          <CanvasMediaBody
+            node={node}
+            {...(workspacePath ? { workspacePath } : {})}
+            {...(workspaceIdentity ? { workspaceIdentity } : {})}
+            onFitAspect={(aspect) => {
+              // 卡片按媒体固有比例贴合；比例已对上时返回 null，不会反复写文档。
+              const fit = fitNodeToAspect({ w: node.w, h: node.h }, aspect);
+              if (fit) onUpdate(fit as Partial<CanvasNode>);
+            }}
+            onUpdate={onUpdate}
+          />
         )}
       </div>
 

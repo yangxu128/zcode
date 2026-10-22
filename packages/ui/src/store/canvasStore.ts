@@ -7,8 +7,6 @@ import {
   createCanvasEdgeId,
   createCanvasNode,
   distributeCanvasNodes,
-  loadCanvasDocument,
-  scheduleCanvasPersist,
   type CanvasAlignMode,
   type CanvasDocument,
   type CanvasEdge,
@@ -17,6 +15,7 @@ import {
   type CanvasNodeKind,
   type CanvasViewport,
 } from "@/lib/canvasDocument.js";
+import { loadCanvasDocument, scheduleCanvasPersist } from "@/lib/canvasBrowserStorage.js";
 import { logger } from "@/logger.js";
 
 /**
