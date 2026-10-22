@@ -12,6 +12,7 @@ import { cloneModelSelection } from "../model-selection.js";
 import { createRefreshRuntimeHeadersBeforeModelAttempt } from "./model-runtime-headers.js";
 import { createRuntimeModel, withModelInvocationContext } from "./runtime-model.js";
 import { applyRuntimeExecutionState } from "../execution-state.js";
+import { modelMaxOutputTokens, modelReasoningValues } from "../../model/option-specs.js";
 import { acceptOffPeakUserTakeover, selectionForPersistence } from "../off-peak/runtime.js";
 
 const selectionAdmissions = new WeakMap<
@@ -162,7 +163,7 @@ export async function applySubmissionExecutionState(
           modelSelection: selection,
           effectiveReasoningLevel: model.options.reasoningLevel,
           previousModelSelection: previousSelection,
-          supportedThoughtLevels: model.optionSpecs.reasoningLevel.values,
+          supportedThoughtLevels: modelReasoningValues(model),
           traceContext,
         });
       }

@@ -83,6 +83,9 @@ import {
   type WorkspaceSidePaneState,
   type WorkspaceSidePaneTab,
 } from "@/lib/workspaceSidePane.js";
+import { isSidePaneTabVisibleForParent } from "@/lib/workspaceSidePane.js";
+import { openCanvasSidePane } from "@/lib/workspaceSidePane.js";
+import { buildCanvasBoardId } from "@/lib/canvasDocument.js";
 import { openPluginUiSidePane } from "@/plugin-ui/index.js";
 import type { OpenPluginUiSideTabRequest } from "@/plugin-ui/contract.js";
 import { logger } from "@/logger.js";
@@ -857,6 +860,28 @@ export function useAppPanels(options: {
   }, [
     commitOpenedSidePaneState,
     defaultWhiteboardNamePrefix,
+    revealSidePaneForCurrentOwner,
+    workspaceAbsPath,
+    workspaceIdentity,
+  ]);
+
+  const handleOpenCanvasTab = useCallback(() => {
+    // 固定画布：同工作区复用同一 board（tab id 去重），内容按 workspace 维度持久化。
+    const boardId = buildCanvasBoardId(workspaceIdentity?.trim() || workspaceAbsPath);
+    revealSidePaneForCurrentOwner();
+    commitOpenedSidePaneState((current) => {
+      const next = openCanvasSidePane(current, {
+        boardId,
+        // 展示标题统一走 getSidePaneTabTitle 的 canvas.title 文案，这里只做持久化兜底。
+        title: "",
+      });
+      logger.info(
+        `[App] 打开右侧面板 mode=canvas workspace=${workspaceAbsPath} board=${boardId} tabs=${next.tabs.length}`,
+      );
+      return next;
+    });
+  }, [
+    commitOpenedSidePaneState,
     revealSidePaneForCurrentOwner,
     workspaceAbsPath,
     workspaceIdentity,
@@ -1671,6 +1696,7 @@ export function useAppPanels(options: {
     handleOpenGit,
     handleOpenTreemapping,
     handleOpenWhiteboard,
+    handleOpenCanvasTab,
     handleOpenDeveloperTools,
     handleOpenPluginMarket,
     handleOpenNewSidePaneTab,

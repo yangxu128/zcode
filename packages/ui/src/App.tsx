@@ -234,6 +234,7 @@ export function App({
     handleToggleGit,
     handleOpenGit,
     handleOpenWhiteboard,
+    handleOpenCanvasTab,
     handleOpenDeveloperTools,
     handleOpenFileManager,
     handleNavigateFileManager,
@@ -1299,6 +1300,7 @@ export function App({
           handleOpenBrowserTab={handleOpenBrowserTab}
           handleOpenBrowserPermissionSettings={handleOpenBrowserPermissionSettings}
           handleOpenWhiteboard={handleOpenWhiteboard}
+          handleOpenCanvasTab={handleOpenCanvasTab}
           handleOpenDeveloperTools={handleOpenDeveloperTools}
           handleOpenFileManager={handleOpenFileManager}
           handleNavigateFileManager={handleNavigateFileManager}

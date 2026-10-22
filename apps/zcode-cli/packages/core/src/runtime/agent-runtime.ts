@@ -1,3 +1,4 @@
+import type { GenerationPort } from "@zcode/contracts";
 import { configureOffPeakRuntime, controlOffPeakRuntime } from "./off-peak/runtime.js";
 import {
   createTurnAgentDefinitions,
@@ -85,6 +86,18 @@ import type {
   WorkspaceGenerateTextInput,
   WorkspaceGenerateTextResult,
 } from "./methods/workspace-generate-text.js";
+import type {
+  WorkspaceGenerateImageInput,
+  WorkspaceGenerateImageResult,
+  WorkspaceSaveMediaInput,
+  WorkspaceSaveMediaResult,
+} from "./methods/workspace-generate-image.js";
+import type {
+  WorkspaceStartVideoInput,
+  WorkspaceStartVideoResult,
+  WorkspaceVideoTaskInput,
+} from "./methods/workspace-generate-video.js";
+import type { VideoTaskOutcome } from "@zcode/contracts";
 import type {
   RuntimeBackgroundStopOptions,
   RuntimeBackgroundStopResult,
@@ -213,6 +226,7 @@ export class AgentRuntime {
   >["prepare"];
   private dynamicWorkflowRunPort?: DynamicWorkflowRunPort;
   private modelCatalogPort?: ModelCatalogPort;
+  private generationPort?: GenerationPort;
   private runtimeTaskRegistry: RuntimeTaskRegistry;
   // 「run 还欠着决定、主代理闲着」的提醒钟；由命令队列的忙 / 闲沿驱动，beginShutdown 停掉。
   private workflowBlockedReminder: WorkflowBlockedReminderClock;
@@ -350,6 +364,7 @@ export class AgentRuntime {
     this.dynamicWorkflowRunPort = deps.dynamicWorkflowRunPort;
     // GUI「配置」解析子代理模型用的目录（与工具上下文拿的是同一个端口）。
     this.modelCatalogPort = deps.modelCatalogPort;
+    this.generationPort = deps.generationPort;
     this.registry = deps.toolRegistry ?? createToolRegistry();
     this.workspaceRoot = this.workingDirectory;
     // 必须先于工具装配：registerRuntimeBuiltInTools 的灰度门读的就是这个状态。
@@ -735,6 +750,21 @@ export interface AgentRuntime {
     input: ModelConnectivityTestInput,
     options?: { abortSignal?: AbortSignal; traceContext?: TraceContext },
   ): Promise<void>;
+  /** 画布节点内生成的执行入口；与 ImageGenerate 工具共用同一候选回退与宿主端口。 */
+  generateWorkspaceImage(
+    input: WorkspaceGenerateImageInput,
+    options?: { abortSignal?: AbortSignal },
+  ): Promise<WorkspaceGenerateImageResult>;
+  /** 生成结果落地到工作区（画布 T6）。 */
+  saveWorkspaceGeneratedMedia(input: WorkspaceSaveMediaInput): Promise<WorkspaceSaveMediaResult>;
+  /** 视频节点：创建任务后立即返回任务身份，由调用方轮询恢复。 */
+  startWorkspaceVideo(
+    input: WorkspaceStartVideoInput,
+    options?: { abortSignal?: AbortSignal },
+  ): Promise<WorkspaceStartVideoResult>;
+  getWorkspaceVideoTask(
+    input: WorkspaceVideoTaskInput,
+  ): Promise<VideoTaskOutcome>;
   isProjectMemoryEnabled(): boolean;
   /** 缺省等待最多 60 秒；null 等待全部已调度提取结束，不设置 drain deadline。 */
   drainMemoryExtractions(timeoutMs?: number | null): Promise<void>;

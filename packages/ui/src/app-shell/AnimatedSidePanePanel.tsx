@@ -38,6 +38,7 @@ import { ScopedErrorBoundary } from "@/ErrorBoundary.js";
 import { GitPane } from "@/GitPane.js";
 import { TreemappingPane } from "@/TreemappingPane.js";
 import { WhiteboardPane } from "@/WhiteboardPane.js";
+import { CanvasPane } from "@/app-shell/CanvasPane.js";
 import { ModelTrajectoryPane } from "@/ModelTrajectoryPane.js";
 import { PluginStorePage } from "@/settings/PluginStorePage.js";
 import { DeveloperToolsPane } from "@/DeveloperToolsPane.js";
@@ -111,6 +112,7 @@ import {
   BugIcon,
   ChevronRightIcon,
   FileDiffIcon,
+  FrameIcon,
   FolderOpenIcon,
   GlobeIcon,
   MessageSquareTextIcon,
@@ -335,6 +337,7 @@ export function AnimatedSidePanePanel({
   onOpenBrowserTab,
   onOpenBrowserPermissionSettings,
   onOpenWhiteboard: _onOpenWhiteboard,
+  onOpenCanvasTab,
   onOpenDeveloperTools,
   onOpenFileManager,
   onNavigateFileManager,
@@ -425,6 +428,7 @@ export function AnimatedSidePanePanel({
   onOpenBrowserTab: () => void;
   onOpenBrowserPermissionSettings?: (origin: string) => void;
   onOpenWhiteboard: () => void;
+  onOpenCanvasTab: () => void;
   onOpenDeveloperTools: () => void;
   onOpenFileManager: (target?: FileManagerTarget) => void;
   onNavigateFileManager: (tabId: string, source: CodeViewerSource) => void;
@@ -814,6 +818,12 @@ export function AnimatedSidePanePanel({
       icon: GlobeIcon,
       onOpen: onOpenBrowserTab,
     },
+    canvas: {
+      id: "canvas",
+      label: intl.formatMessage({ id: "canvas.title" }),
+      icon: FrameIcon,
+      onOpen: onOpenCanvasTab,
+    },
     "developer-tools": {
       id: "developer-tools",
       label: intl.formatMessage({ id: "developerTools.title" }),
@@ -938,6 +948,7 @@ export function AnimatedSidePanePanel({
         codeViewerTitle: intl.formatMessage({ id: "codeViewer.title" }),
         treemappingTitle: intl.formatMessage({ id: "treemapping.title" }),
         whiteboardTitle: intl.formatMessage({ id: "whiteboard.title" }),
+        canvasTitle: intl.formatMessage({ id: "canvas.title" }),
         modelTrajectoryTitle: intl.formatMessage({
           id: "modelTrajectory.title",
         }),
@@ -1364,6 +1375,13 @@ export function AnimatedSidePanePanel({
                             workspacePath={workspaceAbsPath}
                             workspaceIdentity={workspaceIdentity}
                             boardId={tab.boardId}
+                          />
+                        ) : tab.type === "canvas" ? (
+                          <CanvasPane
+                            workspacePath={workspaceAbsPath}
+                            workspaceIdentity={workspaceIdentity}
+                            // 旧版本持久化的 tab 无 boardId，从 id 派生兜底。
+                            boardId={tab.boardId ?? tab.id.replace(/^canvas:/, "")}
                           />
                         ) : tab.type === "model-trajectory" ? (
                           <ModelTrajectoryPane

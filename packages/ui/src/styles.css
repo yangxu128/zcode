@@ -840,6 +840,466 @@ html[data-document-hidden] *::after {
 }
 
 /*
+ * 皮肤（docs/ui/theme-skin.md）：在明暗主题之上只覆盖强调色（primary / brand / accent），
+ * 不触碰背景、结构面与文字色。特异性契约：
+ * - `:root.skin-*`（0,2,0）必须压过 `.theme-zai-*`（0,1,0）；
+ * - `.dark.skin-*` 与 `:root.skin-*` 同为 0,2,0，靠源码顺序保证深色值覆盖浅色值，
+ *   因此每个皮肤的深色块必须紧跟其浅色块之后。
+ * 皮肤 class 由 useTheme.ts 的 applySkin 挂在 documentElement 上，default 不挂 class。
+ */
+:root.skin-ocean {
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-brand: #2563eb;
+  --color-accent: color-mix(in oklab, var(--color-primary) 8%, #ffffff);
+}
+.dark.skin-ocean {
+  --color-primary: #93c5fd;
+  --color-primary-foreground: #172554;
+  --color-brand: #93c5fd;
+  --color-accent: color-mix(in oklab, var(--color-primary) 16%, #0a0a0a);
+}
+
+:root.skin-forest {
+  --color-primary: #15803d;
+  --color-primary-foreground: #ffffff;
+  --color-brand: #15803d;
+  --color-accent: color-mix(in oklab, var(--color-primary) 8%, #ffffff);
+}
+.dark.skin-forest {
+  --color-primary: #86efac;
+  --color-primary-foreground: #052e16;
+  --color-brand: #86efac;
+  --color-accent: color-mix(in oklab, var(--color-primary) 16%, #0a0a0a);
+}
+
+:root.skin-sunset {
+  --color-primary: #c2410c;
+  --color-primary-foreground: #ffffff;
+  --color-brand: #c2410c;
+  --color-accent: color-mix(in oklab, var(--color-primary) 8%, #ffffff);
+}
+.dark.skin-sunset {
+  --color-primary: #fdba74;
+  --color-primary-foreground: #431407;
+  --color-brand: #fdba74;
+  --color-accent: color-mix(in oklab, var(--color-primary) 16%, #0a0a0a);
+}
+
+:root.skin-violet {
+  --color-primary: #6d28d9;
+  --color-primary-foreground: #ffffff;
+  --color-brand: #6d28d9;
+  --color-accent: color-mix(in oklab, var(--color-primary) 8%, #ffffff);
+}
+.dark.skin-violet {
+  --color-primary: #c4b5fd;
+  --color-primary-foreground: #2e1065;
+  --color-brand: #c4b5fd;
+  --color-accent: color-mix(in oklab, var(--color-primary) 16%, #0a0a0a);
+}
+
+/*
+ * 自定义背景图片（docs/ui/theme-skin.md）：lib/wallpaper.ts 在 body 首位维护的固定层，
+ * z-index -1 使其位于画布背景之上、React 内容之下；::after 用 solid 背景色做遮罩保证
+ * 文字可读性。has-wallpaper 同时把工作区/侧边栏背景覆盖为半透明 color-mix 让壁纸透出；
+ * 菜单、弹出层、卡片不透明，不参与覆盖。
+ */
+#zcode-wallpaper-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+#zcode-wallpaper-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--color-background-solid);
+  /* 遮罩浓度由 applyWallpaperStyle 写入内联变量（0–1）；缺省值等于默认浓度 25%。 */
+  opacity: var(--wallpaper-scrim-opacity, 0.25);
+}
+.has-wallpaper {
+  /* 表面透明度由壁纸可见度滑杆驱动（--wallpaper-*-mix 由 lib/wallpaper.ts 计算）。 */
+  --color-background: color-mix(in oklab, var(--color-background-solid) var(--wallpaper-bg-mix, 60%), transparent);
+  --color-background-alt: color-mix(in oklab, var(--color-background-solid) var(--wallpaper-bg-mix, 60%), transparent);
+  --color-background-win-alt: color-mix(in oklab, var(--color-background-win-alt-solid) var(--wallpaper-win-alt-mix, 60%), transparent);
+  --color-sidebar: color-mix(in oklab, var(--color-sidebar-solid) var(--wallpaper-sidebar-mix, 72%), transparent);
+}
+
+/*
+ * Web 入口的引导样式会给 body/#root 画不透明画布（防浏览器工具栏/overscroll 露白），
+ * 壁纸层在其下会被完全遮住；壁纸激活时撤掉这些不透明画布，让固定定位的壁纸层透出。
+ * 本规则与引导样式同为 !important、特异性相同（0,1,1），依赖本文件在引导样式之后加载。
+ * Electron 的根节点本就保持透明（vibrancy），不受影响。
+ */
+html.has-wallpaper,
+html.has-wallpaper body,
+html.has-wallpaper #root {
+  background: transparent !important;
+}
+
+/*
+ * 无限画布侧边面板（docs/ui/canvas-pane.md）：视口网格、节点卡、连线与覆盖层。
+ * 全部使用主题语义变量，跟随明暗主题；zcode-canvas- 前缀避免与其他面板样式冲突。
+ */
+.zcode-canvas-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, var(--color-border) 1px, transparent 1px),
+    linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+  background-size:
+    24px 24px,
+    120px 120px,
+    120px 120px;
+  opacity: 0.45;
+}
+
+.zcode-canvas-world {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.zcode-canvas-hand {
+  cursor: grab;
+}
+
+.zcode-canvas-drop {
+  outline: 2px dashed var(--color-primary);
+  outline-offset: -6px;
+}
+
+.zcode-canvas-node {
+  display: flex;
+  flex-direction: column;
+  cursor: grab;
+  touch-action: none;
+}
+
+.zcode-canvas-node-selected {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.zcode-canvas-node-dragging {
+  cursor: grabbing;
+  z-index: 5;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.zcode-canvas-node-note textarea {
+  font-style: italic;
+}
+
+.zcode-canvas-editable {
+  font-family: inherit;
+}
+
+.zcode-canvas-edge-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.zcode-canvas-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.zcode-canvas-edge-line {
+  fill: none;
+  pointer-events: none;
+}
+
+.zcode-canvas-marquee {
+  position: absolute;
+  z-index: 8;
+  border: 1px solid var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  pointer-events: none;
+}
+
+.zcode-canvas-palette {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-menu);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.zcode-canvas-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--color-foreground-subtle);
+}
+
+.zcode-canvas-tool:hover {
+  background: var(--color-menu-hover);
+  color: var(--color-foreground);
+}
+
+.zcode-canvas-tool.on {
+  background: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.zcode-canvas-tool-sep {
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--color-border);
+}
+
+.zcode-canvas-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-menu);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+}
+
+.zcode-canvas-ctl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--color-foreground-subtle);
+}
+
+.zcode-canvas-ctl:hover {
+  background: var(--color-menu-hover);
+  color: var(--color-foreground);
+}
+
+.zcode-canvas-ctl.on {
+  background: var(--color-accent);
+  color: var(--color-foreground);
+}
+
+.zcode-canvas-zoom-value {
+  min-width: 44px;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+
+.zcode-canvas-ctl-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: var(--color-border);
+}
+
+.zcode-canvas-minimap {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 10;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-menu);
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.zcode-canvas-minimap.on {
+  opacity: 1;
+}
+
+.zcode-canvas-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-menu);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.16);
+}
+
+.zcode-canvas-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--color-foreground);
+}
+
+.zcode-canvas-menu-item:hover {
+  background: var(--color-menu-hover);
+}
+
+.zcode-canvas-menu-item.danger {
+  color: var(--color-destructive);
+}
+
+.zcode-canvas-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--color-border);
+}
+
+.zcode-canvas-selection-toolbar {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-menu);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.16);
+}
+
+.zcode-canvas-selection-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--color-foreground-subtle);
+}
+
+.zcode-canvas-selection-btn:hover {
+  background: var(--color-menu-hover);
+  color: var(--color-foreground);
+}
+
+.zcode-canvas-selection-btn.danger {
+  color: var(--color-destructive);
+}
+
+/*
+ * 媒体节点（docs/ui/canvas-pane.md T7）：有结果时卡片即媒体。
+ * 这里不能开 overflow: hidden —— 卡片左右缘的「+」与连线圆点是负偏移定位在卡片外的，
+ * 一裁就变成贴在边缘的半圆（实测截图里的破相）。媒体自身的裁剪交给正文层。
+ */
+.zcode-canvas-node-media {
+  background: var(--color-background);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
+}
+
+.zcode-canvas-media-stage {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--color-background);
+}
+
+/* 视频留白是播放器的一部分：黑底由元素上的 bg-black 承担（与既有视频样式同一写法）。 */
+
+.zcode-canvas-media-busy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-foreground-subtle);
+  background: rgb(0 0 0 / 0.35);
+}
+
+.zcode-canvas-media-bar {
+  transform: translateX(-50%);
+}
+
+.zcode-canvas-media-dialog {
+  position: fixed;
+  z-index: 20;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-menu);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
+}
+
+.zcode-canvas-lightbox-stage {
+  display: flex;
+  min-height: 240px;
+  max-height: 78vh;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--color-background);
+}
+
+.zcode-canvas-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  text-align: center;
+}
+
+.zcode-canvas-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 6;
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--color-foreground-subtlest);
+  pointer-events: none;
+}
+
+.zcode-canvas-hint kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  font-family: inherit;
+}
+
+/*
+ * 之前只有 task 列表单独定制了滚动条，其他面板、下拉列表、代码区仍然保留系统默认样式，
  * 修复原因：之前只有 task 列表单独定制了滚动条，其他面板、下拉列表、代码区仍然保留系统默认样式，
  * 同一套界面里会出现粗细、圆角和轨道背景都不一致的问题。这里把这套透明轨道 + 圆角 thumb
  * 提升成全局原生滚动条样式，让 desktop/web、明暗主题下的视觉表现保持统一。

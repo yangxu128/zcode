@@ -527,6 +527,9 @@ async function executeToolCallImpl(
         dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
         dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
         modelCatalogPort: deps.modelCatalogPort,
+      // 生成端口必须在这里显式接上：ToolExecutionContext 是逐字段组装的，漏一项
+      // ImageGenerate/VideoGenerate 就会在端口其实存在的情况下报 generation_unavailable。
+      generationPort: deps.generationPort,
         runtimeTaskRegistry: deps.runtimeTaskRegistry,
         readFileState: deps.readFileState,
         recordReadFileStateMetadata: (metadata) => {
