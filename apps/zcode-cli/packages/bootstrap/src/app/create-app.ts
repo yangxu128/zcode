@@ -86,6 +86,7 @@ import {
 import { getWorkflowConcurrencyGovernor } from "./workflow-concurrency-governor.js";
 import { createDynamicWorkflowSnippetService } from "./dynamic-workflow-snippet-service.js";
 import { createGenerationPort } from "./generation-port.js";
+import { createCanvasGenerationWorker } from "../canvas-generation/worker.js";
 import { createModelCatalogPort } from "./model-catalog-port.js";
 import { createDynamicWorkflowRunProgressSink } from "./dynamic-workflow-run-progress-sink.js";
 import { createScriptWorkflowAgentRuntime } from "./script-workflow-child-runtime.js";
@@ -808,6 +809,13 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
       getWorkspacePath: () => workingDirectory,
       logger: logger.child({ module: "generation" }),
     });
+    // 画布意图队列：Agent/插件只写 generation.request，worker 在 agent 进程里执行并回写。
+    // 与工具调用共用同一个 GenerationPort，排队与限流不会分成两条链路。
+    createCanvasGenerationWorker({
+      port: generationPort,
+      workspacePath: workingDirectory,
+      logger: logger.child({ module: "canvas-generation" }),
+    }).start();
     runtime = new AgentRuntime(sessionId, runtimeConfig, {
       ...(options.readSubagentRuntimeConfig
         ? {
