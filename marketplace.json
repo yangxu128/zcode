@@ -1,0 +1,31 @@
+{
+  "name": "zcode-plugins-yangxu",
+  "version": 1,
+  "description": "Personal ZCode plugins by yangxu128",
+  "description_i18n": {
+    "zh-CN": "yangxu128 的个人 ZCode 插件"
+  },
+  "owner": {
+    "name": "yangxu128"
+  },
+  "plugins": [
+    {
+      "name": "canvas",
+      "version": "0.1.0",
+      "description": "Infinite canvas MCP tools: read/edit canvas documents and enqueue image/video generation intents for the host worker.",
+      "description_i18n": {
+        "zh-CN": "无限画布工具：读写画布文档并排图片/视频生成意图，由宿主 worker 执行。"
+      },
+      "author": {
+        "name": "yangxu128"
+      },
+      "category": "productivity",
+      "source": {
+        "source": "github",
+        "repo": "yangxu128/zcode",
+        "ref": "upgrade/3.16.2",
+        "path": "zcode-canvas-plugin/plugins/canvas"
+      }
+    }
+  ]
+}

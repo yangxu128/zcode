@@ -1,0 +1,15 @@
+{
+  "name": "canvas",
+  "version": "0.1.0",
+  "description": "Infinite canvas tools for ZCode: read/edit canvas documents and enqueue image/video generation intents that the host worker executes with the user's configured models.",
+  "author": { "name": "yangxu128" },
+  "license": "MIT",
+  "skills": "skills",
+  "mcpServers": {
+    "canvas": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/server.js"]
+    }
+  }
+}
