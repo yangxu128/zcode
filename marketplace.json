@@ -23,7 +23,7 @@
       "source": {
         "source": "url",
         "type": "zip",
-        "url": "https://fastly.jsdelivr.net/gh/yangxu128/zcode@plugin-marketplace/zcode-canvas-plugin/canvas-0.1.0.zip",
+        "url": "https://fastly.jsdelivr.net/gh/yangxu128/zcode@78bff8ab12d438b51aabc39afe6854cfb4d13874/zcode-canvas-plugin/canvas-0.1.0.zip",
         "sha256": "4700382de4da4ccc03d708a0a6ecf7a58c11c1c49a51d43d01d454276a6e8644"
       }
     }
