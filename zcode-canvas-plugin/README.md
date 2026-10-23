@@ -13,18 +13,24 @@ yangxu128 的 ZCode 画布插件（作者：yangxu128）。让 Agent 读写工�
 https://cdn.jsdelivr.net/gh/yangxu128/zcode@upgrade/3.16.2/marketplace.json
 ```
 
-（或 GitHub raw：`https://raw.githubusercontent.com/yangxu128/zcode/upgrade/3.16.2/marketplace.json`）
+（或 GitHub raw：`https://raw.githubusercontent.com/yangxu128/zcode/plugin-marketplace/marketplace.json`）
 
 **方式 B：GitHub 仓库简写**
 
 在同一入口粘贴：
 
 ```
-yangxu128/zcode#upgrade/3.16.2
+yangxu128/zcode#plugin-marketplace
 ```
 
-注意：插件当前在 `upgrade/3.16.2` 分支，尚未合并到 `main`；用简写会克隆整个 ZCode 仓库，
-比方式 A 慢。
+注意：插件当前在发布分支 `plugin-marketplace`；用简写时添加市场会克隆整个
+ZCode 仓库（较慢），但安装本身只下载下面的小 zip，不会下载整仓。
+
+## 发布物
+
+- `zcode-canvas-plugin/canvas-0.1.0.zip`：插件安装包（约 6 KB），SHA-256
+  `4700382de4da4ccc03d708a0a6ecf7a58c11c1c49a51d43d01d454276a6e8644`。
+- 市场清单 `marketplace.json` 用 `url + zip + sha256` 指向这个包，安装时只下载小包。
 
 添加后进入**插件商店 → 个人来源**，找到 Canvas（无限画布）点安装，然后启用。
 
