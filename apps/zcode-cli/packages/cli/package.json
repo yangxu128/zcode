@@ -12,7 +12,7 @@
   "type": "module",
   "main": "./dist/zcode.cjs",
   "scripts": {
-    "build": "pnpm --filter @zcode/canvas-plugin build && node scripts/build.mjs",
+    "build": "node scripts/build.mjs",
     "build:desktop-agent": "node scripts/build.mjs --desktop-agent",
     "build:sea": "pnpm --dir ../../../.. exec turbo --skip-infer --cwd apps/zcode-cli run build --filter=!@zcode/cli --force && pnpm build && node scripts/build-sea.mjs --all",
     "sea": "node scripts/build-sea.mjs",
