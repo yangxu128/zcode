@@ -13,7 +13,7 @@ yangxu128 的 ZCode 画布插件（作者：yangxu128）。让 Agent 读写工�
 https://cdn.jsdelivr.net/gh/yangxu128/zcode@upgrade/3.16.2/marketplace.json
 ```
 
-（或 GitHub raw：`https://raw.githubusercontent.com/yangxu128/zcode/plugin-marketplace/marketplace.json`）
+（或 GitHub raw：`https://fastly.jsdelivr.net/gh/yangxu128/zcode@plugin-marketplace/marketplace.json`）
 
 **方式 B：GitHub 仓库简写**
 
