@@ -143,6 +143,33 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
     version: "0.1.0",
   },
   {
+    // 画布工具插件：只写 generation.request，执行由 agent 进程的 canvas-generation worker 负责。
+    // 默认启用：它不注入重负载运行时，只是让 Agent 能读写画布文档并排生成意图。
+    defaultEnabled: true,
+    listing: {
+      author: ZAI_AUTHOR,
+      category: "productivity",
+      displayName: "Canvas",
+      displayName_i18n: { "zh-CN": "无限画布" },
+      description_i18n: {
+        "zh-CN": "在画布上组织图片、视频与提示词，让 Agent 自主排生成意图并回写结果。",
+      },
+    },
+    name: "canvas",
+    requiredSeedPaths: [
+      ".zcode-plugin/plugin.json",
+      "skills/canvas/SKILL.md",
+      "dist/server.js",
+    ],
+    rootCandidates: [
+      "packages/canvas-plugin",
+      "../canvas-plugin",
+      "../../canvas-plugin",
+      "../../../canvas-plugin",
+    ],
+    version: "0.1.0",
+  },
+  {
     // 无 listing：宿主不进市场、不对用户露出。它必须始终可用，因为 node_repl 的注册门禁
     // 是「Browser Use 或 Computer Use 任一启用」，宿主自己不参与那个判断。
     //
