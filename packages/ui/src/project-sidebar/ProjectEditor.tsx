@@ -138,7 +138,12 @@ export function ProjectEditor({
   const platform = useOptionalPlatform();
   const [selectedDeviceId, setSelectedDeviceId] = useState(defaultDeviceId ?? "local");
   const hostId =
-    project?.hostId ?? fixedFolder?.hostId ?? host?.id ?? (devices ? selectedDeviceId : undefined);
+    project?.hostId ??
+    fixedFolder?.hostId ??
+    host?.id ??
+    // 空数组也是 truthy：web/server 没有远程设备时不能取默认 "local"，
+    // 否则 readDirectory 会带 hostId=local 打到 server 的 server:<id> owner 上被判 host-offline。
+    (devices && devices.length > 0 ? selectedDeviceId : undefined);
   const remote = Boolean(hostId && hostId !== "local");
   const msg = (id: string) => intl.formatMessage({ id: `project.${id}` });
   const [name, setName] = useState(

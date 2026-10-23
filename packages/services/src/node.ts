@@ -3223,10 +3223,17 @@ export async function createServerHostServices(options: {
   sourceServerId: string;
   zcodeBuiltinProviderConfigFilePath: string;
   providerProvisioningTargetEnabled?: boolean;
+  /**
+   * 单机/dev 场景把项目与任务沿用 local 归属；远程 server 不传，保持 server:<id> 隔离。
+   * 3.16.2 之前写入的 tasks/projects 都是 host_id=local，server 身份下按 host 过滤会读不到。
+   */
+  projectStorageHostId?: string;
 }) {
-  const projectStorageHostId = remoteHostIdFromWorkspaceIdentity(
-    buildServerRemoteWorkspaceIdentity({ serverId: options.sourceServerId, workspacePath: "/" }),
-  );
+  const projectStorageHostId =
+    options.projectStorageHostId ??
+    remoteHostIdFromWorkspaceIdentity(
+      buildServerRemoteWorkspaceIdentity({ serverId: options.sourceServerId, workspacePath: "/" }),
+    );
   if (!projectStorageHostId) throw new Error("Invalid Source Server storage identity");
   await migrateApplicationStorage(await createSettingService().get(), projectStorageHostId);
   const workspaceAliasRepo = new SourceServerWorkspaceAliasRepo();

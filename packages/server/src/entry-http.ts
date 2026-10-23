@@ -20,12 +20,14 @@ async function main(): Promise<void> {
   const authToken = process.env["ZCODE_SERVER_AUTH_TOKEN"]?.trim() || undefined;
   const topicResourcePeers = createTopicResourcePeers();
   const serverId = resolveHttpServerId();
+  const projectStorageHostId = process.env["ZCODE_SERVER_PROJECT_HOST"]?.trim() || undefined;
   const { services, workspaceIdentityMapper, migrationFailedPathCount } =
     await createServerHostServices({
       topicResourceRelayChannel: (request) => topicResourcePeers.getChannel(request),
       sourceServerId: serverId,
       zcodeBuiltinProviderConfigFilePath,
       providerProvisioningTargetEnabled: Boolean(authToken),
+      ...(projectStorageHostId ? { projectStorageHostId } : {}),
     });
 
   createHttpServer(services, port, {
